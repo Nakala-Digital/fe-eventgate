@@ -148,15 +148,3 @@ PUBLIC_APP_ENV=development
    npm run build
    ```
 
----
-
-## 6. Version Control & Commit Standard
-
-### Recommended Commit Commands:
-
-```bash
-git add .
-git commit -m "feat(setup): initialize frontend project structure, base routing, and role placeholders (EVG-39)"
-git push origin main
-```
-
