@@ -11,13 +11,14 @@
 | **Feature** | Event Approval Page for Super Admin |
 | **Tech Stack** | Svelte 5, SvelteKit 2, TypeScript, TailwindCSS 4 |
 | **Author** | Frontend Development Team |
+| **Design Reference** | Wireframe "Event Validation" pada `Super Admin.jpg` (export lokal Figma EventGate_Nakala, on-progress) |
 | **Status** | Completed (Mock API) — Pending Backend Integration (EVG-45) |
 
 ---
 
 ## 1. Executive Summary
 
-Task **EVG-46** mengimplementasikan halaman approval event untuk Super Admin: daftar event berstatus menunggu approval, detail review per event, serta aksi approve dan reject (dengan alasan wajib). Halaman ini menggantikan placeholder EVG-39 di route `/dashboard/super-admin/event-validation` dan hanya bisa diakses oleh role Super Admin.
+Task **EVG-46** mengimplementasikan halaman approval event untuk Super Admin: daftar seluruh event dengan filter & stat ringkasan, halaman detail review terpisah per event, serta aksi approve dan reject (dengan alasan wajib) lewat modal konfirmasi. UI disusun ulang mengikuti wireframe "Event Validation" dari desainer (2 frame: list/table dan detail review) setelah revisi awal yang sempat dibangun murni dari requirement teks.
 
 ---
 
@@ -27,12 +28,16 @@ Task **EVG-46** mengimplementasikan halaman approval event untuk Super Admin: da
 fe-eventgate/
 ├── src/
 │   ├── lib/
+│   │   ├── components/common/
+│   │   │   └── ConfirmActionModal.svelte   # Modal reusable: konfirmasi approve / alasan reject
 │   │   └── services/
-│   │       └── approvalApi.ts        # Data + aksi approval event (mock, swappable ke API asli)
+│   │       └── approvalApi.ts              # Data event (semua status) + aksi approve/reject (mock)
 │   └── routes/
 │       └── dashboard/super-admin/
 │           └── event-validation/
-│               └── +page.svelte      # Halaman list pending + detail review + approve/reject
+│               ├── +page.svelte            # List/table + stat card + filter + aksi inline
+│               └── [id]/
+│                   └── +page.svelte        # Detail review per event
 ```
 
 ---
@@ -40,20 +45,20 @@ fe-eventgate/
 ## 3. Core Components
 
 ### A. Approval Service (`src/lib/services/approvalApi.ts`)
-Menyediakan data event mock dan fungsi:
-- `listPendingEvents()` — daftar event berstatus `pending_approval`.
-- `getEventDetail(eventId)` — detail satu event untuk panel review.
-- `approveEvent(eventId)` — mengubah status menjadi `approved`.
-- `rejectEvent(eventId, reason)` — mengubah status menjadi `rejected` dan menyimpan alasan.
+Model data `ApprovalEvent` mencakup seluruh status (`pending_approval` | `approved` | `rejected`), lengkap dengan `category`, `banner_url`, dan `ticket_types[]` (mendukung >1 tipe tiket per event). Fungsi: `listEvents()`, `getEventDetail(id)`, `approveEvent(id)`, `rejectEvent(id, reason)`. Pola sama seperti `authApi.ts` (EVG-42) — mock in-memory, tinggal diganti `fetch` ke backend begitu EVG-45 tersedia.
 
-Diarsitektur sebagai satu service terpisah (pola sama seperti `authApi.ts` pada EVG-42) agar mudah diganti dengan pemanggilan API backend nyata begitu EVG-45 tersedia.
+### B. Halaman List (`event-validation/+page.svelte`)
+- **Role guard**: redirect ke dashboard sesuai role bila bukan Super Admin (pola sama seperti sebelumnya).
+- **Stat card**: Total Pending / Total di Setujui / Total di Tolak, dihitung dari data.
+- **Filter toolbar**: dropdown Organizer dan Status (client-side filter).
+- **Tabel** (bukan card-list): Nama Event, Penyelenggara, Tanggal Pengajuan, Status (badge warna), Aksi. Menampilkan **semua status**, bukan hanya pending — status yang sudah diproses tetap terlihat di tabel, sesuai wireframe.
+- **Aksi inline per baris**: ikon "Lihat" selalu tersedia (buka halaman detail); ikon Approve/Reject hanya muncul untuk baris berstatus `pending_approval`.
 
-### B. Halaman Validasi Event (`event-validation/+page.svelte`)
-- **Role guard**: `onMount` mengecek `authStore`; jika role bukan `super-admin`, redirect ke dashboard sesuai role user (bukan Admin Panitia/Staf Lapangan yang mencoba akses langsung via URL).
-- **Layout master-detail**: kolom kiri daftar event pending (klik untuk pilih), kolom kanan detail review (judul, deskripsi, organizer, jadwal, lokasi, status tiket berbayar/gratis, kuota).
-- **Approve**: satu klik, langsung mengubah status dan me-refresh daftar.
-- **Reject**: membuka form alasan penolakan; tombol "Kirim Penolakan" divalidasi wajib isi sebelum submit.
-- **Feedback**: pesan sukses/gagal ditampilkan di atas daftar setelah setiap aksi; daftar otomatis menghilangkan event yang sudah diproses dan menampilkan empty state bila semua sudah selesai.
+### C. Halaman Detail Review (`event-validation/[id]/+page.svelte`)
+Layout kartu sesuai wireframe: header (judul + badge status + organizer), card **Detail Acara** (deskripsi + badge kategori), card **Tempat & Waktu**, card **Tipe Tiket** (tabel Nama Tiket/Harga/Kuota), card **Media & Banner** (preview gambar). Tombol Approve/Reject tampil di header bila status masih pending; alasan penolakan ditampilkan bila event sudah ditolak.
+
+### D. Modal Konfirmasi (`src/lib/components/common/ConfirmActionModal.svelte`)
+Komponen reusable dipakai dari kedua halaman: mode approve (konfirmasi tanpa input) dan mode reject (textarea alasan wajib, tervalidasi sebelum submit).
 
 ---
 
@@ -61,11 +66,12 @@ Diarsitektur sebagai satu service terpisah (pola sama seperti `authApi.ts` pada 
 
 | Aksi | Hasil |
 | :--- | :--- |
-| Akses halaman sebagai non-Super Admin | Redirect otomatis ke dashboard sesuai role, tidak bisa membuka halaman |
-| Approve event | Status berubah `approved`, hilang dari daftar pending, feedback sukses tampil |
-| Reject tanpa alasan | Ditolak oleh validasi frontend, pesan error tampil, form tetap terbuka |
-| Reject dengan alasan | Status berubah `rejected` beserta alasan tersimpan, hilang dari daftar pending |
-| Semua event sudah diproses | Daftar menampilkan empty state "Tidak ada event yang menunggu approval" |
+| Akses halaman list/detail sebagai non-Super Admin | Redirect otomatis ke dashboard sesuai role |
+| Approve dari tabel atau halaman detail | Modal konfirmasi → status berubah `approved`, tetap tampil di tabel |
+| Reject tanpa alasan | Modal menampilkan error, submit ditahan |
+| Reject dengan alasan | Status berubah `rejected`, alasan tersimpan & tampil di detail |
+| Filter organizer/status | Tabel ter-filter langsung (client-side) |
+| Event non-pending | Ikon approve/reject disembunyikan, hanya "Lihat" yang aktif |
 
 ---
 
@@ -88,11 +94,12 @@ Diarsitektur sebagai satu service terpisah (pola sama seperti `authApi.ts` pada 
 
 ## 6. Known Gap — Belum Terhubung ke Backend
 
-Scope item **"Menghubungkan UI dengan API approval"** belum terpenuhi sepenuhnya per tanggal dokumen ini dibuat. Konfirmasi ke tim: EVG-45 (Event Approval Workflow API, PIC Hanif) **belum ada konfirmasi selesai**, sehingga `approvalApi.ts` sengaja dibuat mock (in-memory, 2 event contoh) agar UI, role guard, dan alur approve/reject tetap bisa diverifikasi tanpa menunggu backend.
+Scope item **"Menghubungkan UI dengan API approval"** belum terpenuhi sepenuhnya. EVG-45 (Event Approval Workflow API, PIC Hanif) **belum ada konfirmasi selesai**, sehingga `approvalApi.ts` sengaja dibuat mock (in-memory) agar UI, role guard, filter, dan alur approve/reject tetap bisa diverifikasi tanpa menunggu backend.
 
-**Tindak lanjut**: begitu EVG-45 rilis, ganti isi fungsi di `approvalApi.ts` dengan `fetch` ke endpoint backend (`GET /events?status=pending_approval`, `POST /events/{id}/approve`, `POST /events/{id}/reject`, dsb.) — tidak perlu mengubah halaman `event-validation/+page.svelte`.
+**Tindak lanjut**: begitu EVG-45 rilis, ganti isi fungsi di `approvalApi.ts` dengan `fetch` ke endpoint backend — tidak perlu mengubah halaman `event-validation/+page.svelte` maupun `[id]/+page.svelte`.
 
-## 7. Catatan Scope
+## 7. Catatan Scope & Desain
 
-- Tiket ini secara eksplisit hanya meminta aksi **Approve** dan **Reject**. Aksi **Request Revision** disebut pada dokumen requirement EVG-29 dan Role & Permission Matrix EVG-27, namun tidak ada di Scope Pekerjaan/Acceptance Criteria EVG-46 — sengaja tidak diimplementasikan agar tidak keluar dari scope tiket. Bisa ditambahkan sebagai tiket terpisah bila dibutuhkan.
-- Preview form pendaftaran dinamis pada detail review (disebut di EVG-29 sebagai bahan pertimbangan Super Admin) juga di luar scope EVG-46 — itu bagian dari EVG-48 (Dynamic Form Builder).
+- Tiket ini secara eksplisit hanya meminta aksi **Approve** dan **Reject**. Aksi **Request Revision** (disebut di EVG-29 & Role Permission Matrix EVG-27) tidak ada di Scope Pekerjaan/Acceptance Criteria EVG-46 — sengaja tidak diimplementasikan.
+- Desain yang dipakai sebagai acuan adalah wireframe (`Super Admin.jpg`), bukan high-fidelity final dari EVG-54 — desainer mengonfirmasi file tersebut masih on-progress. Styling detail (warna, spacing presisi, komponen final) sebaiknya disesuaikan lagi begitu high-fidelity EVG-54 rilis.
+- Frame "Approve Modal"/"Reject Modal" belum ada di export desain yang diterima; pola modal konfirmasi pada implementasi ini adalah adaptasi wajar dari pola tabel+ikon aksi yang terlihat di wireframe, bukan tiruan pixel-perfect dari desain modal resmi.

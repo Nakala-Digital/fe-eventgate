@@ -2,14 +2,9 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { authStore, type AuthState } from '$lib/stores/authStore';
-	import {
-		listPendingEvents,
-		getEventDetail,
-		approveEvent,
-		rejectEvent,
-		type PendingEvent
-	} from '$lib/services/approvalApi';
-	import { Calendar, MapPin, User, CheckCircle2, XCircle, Loader2 } from 'lucide-svelte';
+	import { listEvents, approveEvent, rejectEvent, type ApprovalEvent } from '$lib/services/approvalApi';
+	import ConfirmActionModal from '$lib/components/common/ConfirmActionModal.svelte';
+	import { Eye, CheckCircle2, XCircle, Loader2 } from 'lucide-svelte';
 
 	let currentAuth = $state<AuthState>({ isAuthenticated: false, user: null, token: null });
 	authStore.subscribe((state) => (currentAuth = state));
@@ -22,70 +17,83 @@
 		}
 	});
 
-	let pendingEvents = $state<PendingEvent[]>([]);
-	let selectedId = $state<number | null>(null);
-	let selected = $state<PendingEvent | undefined>(undefined);
-	let isLoadingList = $state(true);
-	let isSubmitting = $state(false);
-	let showRejectForm = $state(false);
-	let rejectReason = $state('');
+	let events = $state<ApprovalEvent[]>([]);
+	let isLoading = $state(true);
 	let feedback = $state<{ type: 'success' | 'error'; message: string } | null>(null);
 
+	let organizerFilter = $state('all');
+	let statusFilter = $state<'all' | 'pending_approval' | 'approved' | 'rejected'>('all');
+
+	let modalMode = $state<'approve' | 'reject' | null>(null);
+	let modalEvent = $state<ApprovalEvent | null>(null);
+	let isSubmitting = $state(false);
+
 	async function refreshList() {
-		isLoadingList = true;
-		pendingEvents = await listPendingEvents();
-		isLoadingList = false;
-		if (pendingEvents.length > 0) {
-			selectEvent(pendingEvents[0].event_id);
-		} else {
-			selectedId = null;
-			selected = undefined;
-		}
+		isLoading = true;
+		events = await listEvents();
+		isLoading = false;
 	}
 
-	async function selectEvent(id: number) {
-		selectedId = id;
-		showRejectForm = false;
-		rejectReason = '';
-		selected = await getEventDetail(id);
-	}
+	const organizers = $derived([...new Set(events.map((e) => e.organizer_name))]);
+
+	const filteredEvents = $derived(
+		events.filter((e) => {
+			if (organizerFilter !== 'all' && e.organizer_name !== organizerFilter) return false;
+			if (statusFilter !== 'all' && e.status !== statusFilter) return false;
+			return true;
+		})
+	);
+
+	const counts = $derived({
+		pending: events.filter((e) => e.status === 'pending_approval').length,
+		approved: events.filter((e) => e.status === 'approved').length,
+		rejected: events.filter((e) => e.status === 'rejected').length
+	});
+
+	const statusLabel: Record<ApprovalEvent['status'], string> = {
+		pending_approval: 'Menunggu',
+		approved: 'Disetujui',
+		rejected: 'Ditolak'
+	};
+	const statusClass: Record<ApprovalEvent['status'], string> = {
+		pending_approval: 'bg-amber-50 text-amber-700 border-amber-200',
+		approved: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+		rejected: 'bg-red-50 text-red-700 border-red-200'
+	};
 
 	function formatDate(iso: string) {
-		return new Date(iso).toLocaleString('id-ID', {
-			dateStyle: 'medium',
-			timeStyle: 'short'
-		});
+		return new Date(iso).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
 	}
 
-	async function handleApprove() {
-		if (!selected) return;
+	function openApprove(event: ApprovalEvent) {
+		modalMode = 'approve';
+		modalEvent = event;
+	}
+	function openReject(event: ApprovalEvent) {
+		modalMode = 'reject';
+		modalEvent = event;
+	}
+	function closeModal() {
+		modalMode = null;
+		modalEvent = null;
+	}
+
+	async function handleConfirm(reason?: string) {
+		if (!modalEvent) return;
 		isSubmitting = true;
 		feedback = null;
 		try {
-			await approveEvent(selected.event_id);
-			feedback = { type: 'success', message: `Event "${selected.title}" berhasil disetujui.` };
+			if (modalMode === 'approve') {
+				await approveEvent(modalEvent.event_id);
+				feedback = { type: 'success', message: `Event "${modalEvent.title}" berhasil disetujui.` };
+			} else if (modalMode === 'reject') {
+				await rejectEvent(modalEvent.event_id, reason ?? '');
+				feedback = { type: 'success', message: `Event "${modalEvent.title}" ditolak.` };
+			}
 			await refreshList();
+			closeModal();
 		} catch {
-			feedback = { type: 'error', message: 'Gagal menyetujui event, coba lagi.' };
-		} finally {
-			isSubmitting = false;
-		}
-	}
-
-	async function handleReject() {
-		if (!selected) return;
-		if (!rejectReason.trim()) {
-			feedback = { type: 'error', message: 'Alasan penolakan wajib diisi.' };
-			return;
-		}
-		isSubmitting = true;
-		feedback = null;
-		try {
-			await rejectEvent(selected.event_id, rejectReason.trim());
-			feedback = { type: 'success', message: `Event "${selected.title}" ditolak.` };
-			await refreshList();
-		} catch {
-			feedback = { type: 'error', message: 'Gagal menolak event, coba lagi.' };
+			feedback = { type: 'error', message: 'Aksi gagal diproses, coba lagi.' };
 		} finally {
 			isSubmitting = false;
 		}
@@ -98,7 +106,7 @@
 
 <div class="space-y-6">
 	<div class="border-b border-slate-200 pb-4">
-		<h1 class="text-xl font-bold text-slate-900">Validasi Event</h1>
+		<h1 class="text-xl font-bold text-slate-900">Event Validation</h1>
 		<p class="text-xs text-slate-500">Review, setujui, atau tolak event yang diajukan Admin Panitia.</p>
 	</div>
 
@@ -112,114 +120,120 @@
 		</div>
 	{/if}
 
-	<div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
-		<!-- List pending approval -->
-		<div class="lg:col-span-2 bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-			<div class="px-4 py-3 border-b border-slate-100 text-xs font-semibold text-slate-600 uppercase">
-				Menunggu Approval ({pendingEvents.length})
-			</div>
-			{#if isLoadingList}
-				<div class="p-6 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
-					<Loader2 class="w-4 h-4 animate-spin" /> Memuat data...
-				</div>
-			{:else if pendingEvents.length === 0}
-				<div class="p-6 text-center text-xs text-slate-400">Tidak ada event yang menunggu approval.</div>
-			{:else}
-				<ul class="divide-y divide-slate-100">
-					{#each pendingEvents as event (event.event_id)}
-						<li>
-							<button
-								onclick={() => selectEvent(event.event_id)}
-								class="w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors {selectedId === event.event_id ? 'bg-emerald-50' : ''}"
-							>
-								<p class="text-sm font-semibold text-slate-900">{event.title}</p>
-								<p class="text-[11px] text-slate-500">{event.organizer_name} · Diajukan {formatDate(event.submitted_at)}</p>
-							</button>
-						</li>
-					{/each}
-				</ul>
-			{/if}
+	<!-- Stat cards -->
+	<div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+		<div class="bg-white border border-slate-200 rounded-xl p-4">
+			<p class="text-xs text-slate-500">Total Pending</p>
+			<p class="text-2xl font-bold text-slate-900">{counts.pending}</p>
 		</div>
-
-		<!-- Detail review -->
-		<div class="lg:col-span-3 bg-white border border-slate-200 rounded-xl shadow-sm p-6">
-			{#if !selected}
-				<p class="text-xs text-slate-400">Pilih event di daftar untuk melihat detail review.</p>
-			{:else}
-				<div class="space-y-4">
-					<div>
-						<h2 class="text-lg font-bold text-slate-900">{selected.title}</h2>
-						<p class="text-xs text-slate-500 flex items-center gap-1 mt-1">
-							<User class="w-3.5 h-3.5" /> {selected.organizer_name}
-						</p>
-					</div>
-
-					<p class="text-sm text-slate-700">{selected.description}</p>
-
-					<div class="grid grid-cols-2 gap-3 text-xs">
-						<div class="flex items-center gap-2 text-slate-600">
-							<Calendar class="w-4 h-4 text-emerald-700" />
-							{formatDate(selected.start_date)} — {formatDate(selected.end_date)}
-						</div>
-						<div class="flex items-center gap-2 text-slate-600">
-							<MapPin class="w-4 h-4 text-emerald-700" />
-							{selected.location}
-						</div>
-						<div class="text-slate-600">
-							<span class="font-semibold">Status Tiket:</span>
-							{selected.is_paid ? `Berbayar (Rp${selected.price.toLocaleString('id-ID')})` : 'Gratis'}
-						</div>
-						<div class="text-slate-600">
-							<span class="font-semibold">Kuota:</span> {selected.quota} peserta
-						</div>
-					</div>
-
-					{#if showRejectForm}
-						<div class="space-y-2 border border-red-200 bg-red-50 rounded-lg p-3">
-							<label for="reject-reason" class="text-[11px] font-bold text-red-700 uppercase">Alasan Penolakan (wajib)</label>
-							<textarea
-								id="reject-reason"
-								bind:value={rejectReason}
-								rows="3"
-								placeholder="Jelaskan alasan event ini ditolak..."
-								class="w-full text-xs border border-red-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-500"
-							></textarea>
-							<div class="flex gap-2 justify-end">
-								<button
-									onclick={() => (showRejectForm = false)}
-									class="text-xs font-semibold text-slate-600 px-3 py-1.5 rounded-lg hover:bg-slate-100"
-								>
-									Batal
-								</button>
-								<button
-									onclick={handleReject}
-									disabled={isSubmitting}
-									class="text-xs font-bold bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white px-4 py-1.5 rounded-lg"
-								>
-									Kirim Penolakan
-								</button>
-							</div>
-						</div>
-					{:else}
-						<div class="flex gap-3 pt-2">
-							<button
-								onclick={handleApprove}
-								disabled={isSubmitting}
-								class="flex items-center gap-1.5 text-xs font-bold bg-emerald-700 hover:bg-emerald-800 disabled:opacity-60 text-white px-4 py-2 rounded-lg shadow"
-							>
-								<CheckCircle2 class="w-4 h-4" /> Approve
-							</button>
-							<button
-								onclick={() => (showRejectForm = true)}
-								disabled={isSubmitting}
-								class="flex items-center gap-1.5 text-xs font-bold bg-white hover:bg-red-50 disabled:opacity-60 text-red-700 border border-red-300 px-4 py-2 rounded-lg"
-							>
-								<XCircle class="w-4 h-4" /> Reject
-							</button>
-						</div>
-					{/if}
-				</div>
-			{/if}
+		<div class="bg-white border border-slate-200 rounded-xl p-4">
+			<p class="text-xs text-slate-500">Total di Setujui</p>
+			<p class="text-2xl font-bold text-slate-900">{counts.approved}</p>
+		</div>
+		<div class="bg-white border border-slate-200 rounded-xl p-4">
+			<p class="text-xs text-slate-500">Total di Tolak</p>
+			<p class="text-2xl font-bold text-slate-900">{counts.rejected}</p>
 		</div>
 	</div>
+
+	<!-- Filter toolbar -->
+	<div class="flex flex-wrap gap-3">
+		<select
+			bind:value={organizerFilter}
+			class="text-xs border border-slate-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600"
+		>
+			<option value="all">Semua Organizer</option>
+			{#each organizers as organizer}
+				<option value={organizer}>{organizer}</option>
+			{/each}
+		</select>
+		<select
+			bind:value={statusFilter}
+			class="text-xs border border-slate-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600"
+		>
+			<option value="all">Semua Status</option>
+			<option value="pending_approval">Menunggu</option>
+			<option value="approved">Disetujui</option>
+			<option value="rejected">Ditolak</option>
+		</select>
+	</div>
+
+	<!-- Table -->
+	<div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden overflow-x-auto">
+		{#if isLoading}
+			<div class="p-6 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
+				<Loader2 class="w-4 h-4 animate-spin" /> Memuat data...
+			</div>
+		{:else if filteredEvents.length === 0}
+			<div class="p-6 text-center text-xs text-slate-400">Tidak ada event yang cocok dengan filter.</div>
+		{:else}
+			<table class="w-full text-xs">
+				<thead class="bg-slate-50 text-slate-500 uppercase text-[11px]">
+					<tr>
+						<th class="text-left px-4 py-2.5 font-semibold">Nama Event</th>
+						<th class="text-left px-4 py-2.5 font-semibold">Penyelenggara</th>
+						<th class="text-left px-4 py-2.5 font-semibold">Tanggal Pengajuan</th>
+						<th class="text-left px-4 py-2.5 font-semibold">Status</th>
+						<th class="text-left px-4 py-2.5 font-semibold">Aksi</th>
+					</tr>
+				</thead>
+				<tbody class="divide-y divide-slate-100">
+					{#each filteredEvents as event (event.event_id)}
+						<tr class="hover:bg-slate-50">
+							<td class="px-4 py-3 font-semibold text-slate-900">{event.title}</td>
+							<td class="px-4 py-3 text-slate-600">{event.organizer_name}</td>
+							<td class="px-4 py-3 text-slate-600">{formatDate(event.submitted_at)}</td>
+							<td class="px-4 py-3">
+								<span class="border rounded-full px-2 py-0.5 text-[11px] font-semibold {statusClass[event.status]}">
+									{statusLabel[event.status]}
+								</span>
+							</td>
+							<td class="px-4 py-3">
+								<div class="flex items-center gap-2">
+									<button
+										onclick={() => goto(`/dashboard/super-admin/event-validation/${event.event_id}`)}
+										title="Lihat detail"
+										class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600"
+									>
+										<Eye class="w-4 h-4" />
+									</button>
+									{#if event.status === 'pending_approval'}
+										<button
+											onclick={() => openApprove(event)}
+											title="Approve"
+											class="p-1.5 rounded-lg hover:bg-emerald-50 text-emerald-700"
+										>
+											<CheckCircle2 class="w-4 h-4" />
+										</button>
+										<button
+											onclick={() => openReject(event)}
+											title="Reject"
+											class="p-1.5 rounded-lg hover:bg-red-50 text-red-600"
+										>
+											<XCircle class="w-4 h-4" />
+										</button>
+									{/if}
+								</div>
+							</td>
+						</tr>
+					{/each}
+				</tbody>
+			</table>
+		{/if}
+	</div>
 </div>
+
+<ConfirmActionModal
+	open={modalMode !== null}
+	title={modalMode === 'approve' ? 'Setujui Event?' : 'Tolak Event'}
+	description={modalEvent
+		? `Event "${modalEvent.title}" oleh ${modalEvent.organizer_name}.`
+		: ''}
+	requireReason={modalMode === 'reject'}
+	reasonLabel="Alasan Penolakan (wajib)"
+	confirmLabel={modalMode === 'approve' ? 'Ya, Setujui' : 'Kirim Penolakan'}
+	confirmClass={modalMode === 'approve' ? 'bg-emerald-700 hover:bg-emerald-800' : 'bg-red-600 hover:bg-red-700'}
+	{isSubmitting}
+	onConfirm={handleConfirm}
+	onCancel={closeModal}
+/>
