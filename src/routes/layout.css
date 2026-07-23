@@ -1,0 +1,14 @@
+@import 'tailwindcss';
+
+@layer utilities {
+  .light-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+  }
+  .accent-emerald {
+    color: #047857;
+  }
+  .bg-accent-emerald {
+    background-color: #047857;
+  }
+}
