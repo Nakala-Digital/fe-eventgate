@@ -3,7 +3,7 @@
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { authStore, type AuthState } from '$lib/stores/authStore';
-	import { getEventDetail, approveEvent, rejectEvent, type ApprovalEvent } from '$lib/services/approvalApi';
+	import { getEventById, updateEventStatus, type ManagedEvent } from '$lib/services/eventApi';
 	import ConfirmActionModal from '$lib/components/common/ConfirmActionModal.svelte';
 	import { ArrowLeft, Calendar, MapPin, Image as ImageIcon } from 'lucide-svelte';
 
@@ -12,7 +12,7 @@
 
 	const eventId = $derived(Number(page.params.id));
 
-	let event = $state<ApprovalEvent | undefined>(undefined);
+	let event = $state<ManagedEvent | null>(null);
 	let isLoading = $state(true);
 	let feedback = $state<{ type: 'success' | 'error'; message: string } | null>(null);
 	let modalMode = $state<'approve' | 'reject' | null>(null);
@@ -28,19 +28,29 @@
 
 	async function loadEvent() {
 		isLoading = true;
-		event = await getEventDetail(eventId);
+		try {
+			event = await getEventById(eventId);
+		} catch {
+			event = null;
+		}
 		isLoading = false;
 	}
 
 	const statusLabel: Record<string, string> = {
+		draft: 'Draft',
 		pending_approval: 'Menunggu',
 		approved: 'Disetujui',
-		rejected: 'Ditolak'
+		published: 'Dipublikasikan',
+		rejected: 'Ditolak',
+		ended: 'Selesai'
 	};
 	const statusClass: Record<string, string> = {
+		draft: 'bg-slate-100 text-slate-600 border-slate-200',
 		pending_approval: 'bg-amber-50 text-amber-700 border-amber-200',
 		approved: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-		rejected: 'bg-red-50 text-red-700 border-red-200'
+		published: 'bg-blue-50 text-blue-700 border-blue-200',
+		rejected: 'bg-red-50 text-red-700 border-red-200',
+		ended: 'bg-slate-100 text-slate-500 border-slate-200'
 	};
 
 	function formatDateTime(iso: string) {
@@ -53,10 +63,10 @@
 		feedback = null;
 		try {
 			if (modalMode === 'approve') {
-				await approveEvent(event.event_id);
+				await updateEventStatus(event.id, 'approved');
 				feedback = { type: 'success', message: 'Event berhasil disetujui.' };
 			} else if (modalMode === 'reject') {
-				await rejectEvent(event.event_id, reason ?? '');
+				await updateEventStatus(event.id, 'rejected', reason);
 				feedback = { type: 'success', message: 'Event ditolak.' };
 			}
 			await loadEvent();
@@ -163,22 +173,20 @@
 						</tr>
 					</thead>
 					<tbody class="divide-y divide-slate-100">
-						{#each event.ticket_types as ticket}
-							<tr>
-								<td class="py-1.5 text-slate-700">{ticket.name}</td>
-								<td class="py-1.5 text-slate-700">{ticket.price === 0 ? 'Gratis' : ticket.price.toLocaleString('id-ID')}</td>
-								<td class="py-1.5 text-slate-700">{ticket.quota}</td>
-							</tr>
-						{/each}
+						<tr>
+							<td class="py-1.5 text-slate-700 capitalize">{event.ticket_type}</td>
+							<td class="py-1.5 text-slate-700">{event.price === 0 ? 'Gratis' : event.price.toLocaleString('id-ID')}</td>
+							<td class="py-1.5 text-slate-700">{event.quota}</td>
+						</tr>
 					</tbody>
 				</table>
 			</div>
 
 			<div class="bg-white border border-slate-200 rounded-xl p-5 space-y-3">
 				<h2 class="text-sm font-bold text-slate-900">Media & Banner</h2>
-				<div class="aspect-video rounded-lg bg-slate-100 flex items-center justify-center text-slate-400">
+				<div class="aspect-video rounded-lg bg-slate-100 flex items-center justify-center text-slate-400 overflow-hidden">
 					{#if event.banner_url}
-						<img src={event.banner_url} alt="Banner event" class="w-full h-full object-cover rounded-lg" />
+						<img src={event.banner_url} alt="Banner event" class="w-full h-full object-cover" />
 					{:else}
 						<ImageIcon class="w-8 h-8" />
 					{/if}

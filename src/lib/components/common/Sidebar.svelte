@@ -26,6 +26,9 @@
 		],
 		'field-staff': [
 			{ label: 'Scan QR Operator', href: '/dashboard/field-staff', icon: QrCode },
+		],
+		'school-reviewer': [
+			{ label: 'School Reviewer Overview', href: '/dashboard/school-reviewer', icon: ShieldCheck },
 		]
 	};
 

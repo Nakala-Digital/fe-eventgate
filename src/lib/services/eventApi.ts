@@ -120,6 +120,15 @@ function getAuthHeader(): Record<string, string> {
 	return auth.token ? { Authorization: `Bearer ${auth.token}` } : {};
 }
 
+// ponytail: be-eventgate returns bare JSON for /auth & /events (no {data: ...} envelope,
+// unlike /health which does use one) — unwrap either shape so real responses aren't
+// silently mistaken for "no data" and dropped to the mock fallback below.
+function unwrap(json: unknown): unknown {
+	return json && typeof json === 'object' && 'data' in (json as Record<string, unknown>)
+		? (json as Record<string, unknown>).data
+		: json;
+}
+
 /**
  * Fetch all events (with optional search / organizer filter)
  */
@@ -138,10 +147,8 @@ export async function listEvents(params?: {
 		const res = await fetch(url, { headers: { ...getAuthHeader() } });
 
 		if (res.ok) {
-			const json = await res.json();
-			if (json.data && Array.isArray(json.data)) {
-				return json.data;
-			}
+			const payload = unwrap(await res.json());
+			if (Array.isArray(payload)) return payload as ManagedEvent[];
 		}
 	} catch {
 		// Fallback to in-memory mock if backend unavailable
@@ -178,8 +185,8 @@ export async function getEventById(id: number): Promise<ManagedEvent> {
 			headers: { ...getAuthHeader() }
 		});
 		if (res.ok) {
-			const json = await res.json();
-			if (json.data) return json.data;
+			const payload = unwrap(await res.json());
+			if (payload && typeof payload === 'object') return payload as ManagedEvent;
 		}
 	} catch {
 		// Fallback to mock
@@ -214,8 +221,8 @@ export async function createEvent(data: EventFormData): Promise<ManagedEvent> {
 			body: JSON.stringify(newEvent)
 		});
 		if (res.ok) {
-			const json = await res.json();
-			if (json.data) return json.data;
+			const payload = unwrap(await res.json());
+			if (payload && typeof payload === 'object') return payload as ManagedEvent;
 		}
 	} catch {
 		// Fallback to mock update
@@ -241,8 +248,8 @@ export async function updateEvent(id: number, data: EventFormData): Promise<Mana
 			body: JSON.stringify(data)
 		});
 		if (res.ok) {
-			const json = await res.json();
-			if (json.data) return json.data;
+			const payload = unwrap(await res.json());
+			if (payload && typeof payload === 'object') return payload as ManagedEvent;
 		}
 	} catch {
 		// Fallback to mock
@@ -280,9 +287,10 @@ export async function deleteEvent(id: number): Promise<boolean> {
 }
 
 /**
- * Update event status (e.g. submit for approval, publish, draft)
+ * Update event status (e.g. submit for approval, publish, draft, approve, reject).
+ * `reason` is required by the approval flow (EVG-46) when rejecting an event.
  */
-export async function updateEventStatus(id: number, status: EventStatus): Promise<ManagedEvent> {
+export async function updateEventStatus(id: number, status: EventStatus, reason?: string): Promise<ManagedEvent> {
 	try {
 		const res = await fetch(`${ENV.API_BASE_URL}/events/${id}/status`, {
 			method: 'PATCH',
@@ -290,11 +298,11 @@ export async function updateEventStatus(id: number, status: EventStatus): Promis
 				'Content-Type': 'application/json',
 				...getAuthHeader()
 			},
-			body: JSON.stringify({ status })
+			body: JSON.stringify(reason ? { status, reject_reason: reason } : { status })
 		});
 		if (res.ok) {
-			const json = await res.json();
-			if (json.data) return json.data;
+			const payload = unwrap(await res.json());
+			if (payload && typeof payload === 'object') return payload as ManagedEvent;
 		}
 	} catch {
 		// Fallback to mock
@@ -305,5 +313,6 @@ export async function updateEventStatus(id: number, status: EventStatus): Promis
 
 	mockEvents[index].status = status;
 	mockEvents[index].updated_at = new Date().toISOString();
+	if (reason) mockEvents[index].reject_reason = reason;
 	return delay(mockEvents[index]);
 }

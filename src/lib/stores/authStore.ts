@@ -1,7 +1,7 @@
 import { writable } from 'svelte/store';
 import { browser } from '$app/environment';
 
-export type UserRole = 'super-admin' | 'panitia' | 'peserta' | 'field-staff';
+export type UserRole = 'super-admin' | 'panitia' | 'peserta' | 'field-staff' | 'school-reviewer';
 
 export interface UserProfile {
 	id: string;
