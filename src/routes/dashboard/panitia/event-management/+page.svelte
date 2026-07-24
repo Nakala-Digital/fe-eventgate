@@ -16,6 +16,7 @@
 		Calendar,
 		MapPin,
 		Edit3,
+		ListChecks,
 		Trash2,
 		Loader2,
 		AlertCircle,
@@ -394,6 +395,15 @@
 											<Globe class="w-3 h-3" /> Publish
 										</button>
 									{/if}
+
+									<!-- Form Builder -->
+									<button
+										onclick={() => goto(`/dashboard/panitia/event-management/${event.id}/form-builder`)}
+										title="Form Builder"
+										class="p-1.5 rounded-lg text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 transition"
+									>
+										<ListChecks class="w-3.5 h-3.5" />
+									</button>
 
 									<!-- Edit -->
 									<button
