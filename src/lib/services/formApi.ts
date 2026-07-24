@@ -36,7 +36,7 @@ let mockQuestions: DynamicQuestion[] = [
 	{
 		id: 1,
 		event_id: 1,
-		label: 'Nama Lengkap',
+		label: 'Nama Orang Tua/Wali',
 		type: 'text',
 		requirement: 'wajib',
 		options: [],
@@ -56,18 +56,30 @@ let mockQuestions: DynamicQuestion[] = [
 		order: 2
 	},
 	{
+		id: 4,
+		event_id: 1,
+		label: 'Konsumsi Khusus',
+		type: 'checkbox',
+		requirement: 'opsional',
+		options: [
+			{ id: 4, label: 'Vegetarian' },
+			{ id: 5, label: 'Tanpa Gula' }
+		],
+		order: 3
+	},
+	{
 		id: 3,
 		event_id: 1,
 		label: 'Catatan Tambahan',
 		type: 'textarea',
 		requirement: 'opsional',
 		options: [],
-		order: 3
+		order: 4
 	}
 ];
 
-let nextQuestionId = 4;
-let nextOptionId = 4;
+let nextQuestionId = 5;
+let nextOptionId = 6;
 
 function delay<T>(value: T, ms = 300): Promise<T> {
 	return new Promise((resolve) => setTimeout(() => resolve(value), ms));
