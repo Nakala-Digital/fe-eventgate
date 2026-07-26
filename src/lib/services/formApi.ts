@@ -96,6 +96,35 @@ function unwrap(json: unknown): unknown {
 		: json;
 }
 
+// ponytail: be-eventgate's real Dynamic Question model (EVG-47) uses different field
+// names (question_text/question_type/requirement_type/display_order/option_label) and
+// `dropdown` instead of `select` — translate at the boundary so the rest of the app
+// (form builder UI, registration form) keeps using the simpler internal shape.
+function mapBackendQuestion(raw: Record<string, any>): DynamicQuestion {
+	return {
+		id: raw.id,
+		event_id: raw.event_id,
+		label: raw.question_text,
+		type: raw.question_type === 'dropdown' ? 'select' : raw.question_type,
+		// `kondisional` (conditional questions) is out of EVG-48 scope — real questions
+		// saved as kondisional by another client still render here, treated as opsional.
+		requirement: raw.requirement_type === 'wajib' ? 'wajib' : 'opsional',
+		options: (raw.options ?? []).map((o: any) => ({ id: o.id, label: o.option_label })),
+		order: raw.display_order
+	};
+}
+
+function toBackendQuestionPayload(data: QuestionFormData, displayOrder?: number) {
+	const needsOptions = data.type === 'select' || data.type === 'radio' || data.type === 'checkbox';
+	return {
+		question_text: data.label,
+		question_type: data.type === 'select' ? 'dropdown' : data.type,
+		requirement_type: data.requirement,
+		...(displayOrder !== undefined ? { display_order: displayOrder } : {}),
+		options: needsOptions ? data.options.map((label, i) => ({ option_label: label, option_value: label, display_order: i + 1 })) : []
+	};
+}
+
 function toQuestion(eventId: number, data: QuestionFormData, id: number, order: number): DynamicQuestion {
 	const needsOptions = data.type === 'select' || data.type === 'radio' || data.type === 'checkbox';
 	return {
@@ -116,7 +145,7 @@ export async function listQuestions(eventId: number): Promise<DynamicQuestion[]>
 		});
 		if (res.ok) {
 			const payload = unwrap(await res.json());
-			if (Array.isArray(payload)) return payload as DynamicQuestion[];
+			if (Array.isArray(payload)) return payload.map(mapBackendQuestion).sort((a, b) => a.order - b.order);
 		}
 	} catch {
 		// Fallback to in-memory mock if backend unavailable
@@ -132,11 +161,11 @@ export async function createQuestion(eventId: number, data: QuestionFormData): P
 		const res = await fetch(`${ENV.API_BASE_URL}/events/${eventId}/questions`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
-			body: JSON.stringify(data)
+			body: JSON.stringify(toBackendQuestionPayload(data))
 		});
 		if (res.ok) {
 			const payload = unwrap(await res.json());
-			if (payload && typeof payload === 'object') return payload as DynamicQuestion;
+			if (payload && typeof payload === 'object') return mapBackendQuestion(payload as Record<string, any>);
 		}
 	} catch {
 		// Fallback to mock
@@ -151,17 +180,18 @@ export async function createQuestion(eventId: number, data: QuestionFormData): P
 export async function updateQuestion(
 	eventId: number,
 	questionId: number,
-	data: QuestionFormData
+	data: QuestionFormData,
+	displayOrder?: number
 ): Promise<DynamicQuestion> {
 	try {
 		const res = await fetch(`${ENV.API_BASE_URL}/events/${eventId}/questions/${questionId}`, {
 			method: 'PUT',
 			headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
-			body: JSON.stringify(data)
+			body: JSON.stringify(toBackendQuestionPayload(data, displayOrder))
 		});
 		if (res.ok) {
 			const payload = unwrap(await res.json());
-			if (payload && typeof payload === 'object') return payload as DynamicQuestion;
+			if (payload && typeof payload === 'object') return mapBackendQuestion(payload as Record<string, any>);
 		}
 	} catch {
 		// Fallback to mock
@@ -191,18 +221,36 @@ export async function deleteQuestion(eventId: number, questionId: number): Promi
 
 /**
  * Move a question up/down in display order by swapping `order` with its neighbor.
+ * Against the real backend this re-PUTs both questions (Replace-All strategy —
+ * the full question body is required, not just `display_order`).
  */
-export async function reorderQuestion(eventId: number, questionId: number, direction: 'up' | 'down'): Promise<void> {
-	const list = mockQuestions.filter((q) => q.event_id === eventId).sort((a, b) => a.order - b.order);
+export async function reorderQuestion(
+	eventId: number,
+	questionId: number,
+	direction: 'up' | 'down',
+	currentList: DynamicQuestion[]
+): Promise<void> {
+	const list = [...currentList].sort((a, b) => a.order - b.order);
 	const index = list.findIndex((q) => q.id === questionId);
 	const swapIndex = direction === 'up' ? index - 1 : index + 1;
 	if (index === -1 || swapIndex < 0 || swapIndex >= list.length) return;
 
 	const a = list[index];
 	const b = list[swapIndex];
-	const aOrder = a.order;
-	a.order = b.order;
-	b.order = aOrder;
+
+	await Promise.all([
+		updateQuestion(eventId, a.id, { label: a.label, type: a.type, requirement: a.requirement, options: a.options.map((o) => o.label) }, b.order),
+		updateQuestion(eventId, b.id, { label: b.label, type: b.type, requirement: b.requirement, options: b.options.map((o) => o.label) }, a.order)
+	]);
+
+	// Keep mock array consistent too (no-op against real backend, matters for offline mode).
+	const mockA = mockQuestions.find((q) => q.id === a.id);
+	const mockB = mockQuestions.find((q) => q.id === b.id);
+	if (mockA && mockB) {
+		const tmp = mockA.order;
+		mockA.order = mockB.order;
+		mockB.order = tmp;
+	}
 
 	await delay(undefined, 150);
 }

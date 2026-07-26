@@ -167,7 +167,7 @@
 	}
 
 	async function move(q: DynamicQuestion, direction: 'up' | 'down') {
-		await reorderQuestion(eventId, q.id, direction);
+		await reorderQuestion(eventId, q.id, direction, questions);
 		await loadData();
 	}
 </script>

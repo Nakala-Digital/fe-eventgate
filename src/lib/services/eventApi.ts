@@ -2,7 +2,14 @@ import { ENV } from '$lib/config/env';
 import { authStore } from '$lib/stores/authStore';
 import { get } from 'svelte/store';
 
-export type EventStatus = 'draft' | 'pending_approval' | 'approved' | 'published' | 'rejected' | 'ended';
+export type EventStatus =
+	| 'draft'
+	| 'pending_approval'
+	| 'approved'
+	| 'revision_requested'
+	| 'published'
+	| 'rejected'
+	| 'ended';
 export type TicketTypeMode = 'gratis' | 'berbayar';
 
 export interface ManagedEvent {
@@ -129,6 +136,58 @@ function unwrap(json: unknown): unknown {
 		: json;
 }
 
+// ponytail: be-eventgate's real Event model uses different field names/shape than
+// ManagedEvent (title/banner/start_time/end_time/is_paid, nested organizer, no
+// `category`) — translate so real API responses render correctly instead of blank.
+// `category` has no backend column yet (out of scope for EVG-46/48, flagged to BE team).
+function mapBackendEvent(raw: Record<string, any>): ManagedEvent {
+	return {
+		id: raw.id,
+		title: raw.title,
+		description: raw.description,
+		category: raw.category ?? 'Umum',
+		organizer_name: raw.organizer?.username || raw.created_by_user?.username || 'Tidak diketahui',
+		location: raw.location,
+		start_date: raw.start_time,
+		end_date: raw.end_time,
+		banner_url: raw.banner,
+		ticket_type: raw.is_paid ? 'berbayar' : 'gratis',
+		price: raw.price ?? 0,
+		quota: raw.quota,
+		status: raw.status,
+		created_at: raw.created_at,
+		updated_at: raw.updated_at,
+		reject_reason: raw.reject_reason
+	};
+}
+
+export interface ApprovalLogEntry {
+	id: number;
+	event_id: number;
+	action: 'submitted' | 'approved' | 'rejected' | 'revision_requested';
+	notes?: string;
+	reviewed_at?: string;
+}
+
+/**
+ * Fetch approval history for an event (EVG-45). Used to recover the reject/revision
+ * reason, since the real backend stores it on the log entry, not on the event itself.
+ */
+export async function getApprovalLogs(eventId: number): Promise<ApprovalLogEntry[]> {
+	try {
+		const res = await fetch(`${ENV.API_BASE_URL}/events/${eventId}/approval-logs`, {
+			headers: { ...getAuthHeader() }
+		});
+		if (res.ok) {
+			const payload = unwrap(await res.json());
+			if (Array.isArray(payload)) return payload as ApprovalLogEntry[];
+		}
+	} catch {
+		// No logs available (mock mode or backend unreachable)
+	}
+	return [];
+}
+
 /**
  * Fetch all events (with optional search / organizer filter)
  */
@@ -148,7 +207,7 @@ export async function listEvents(params?: {
 
 		if (res.ok) {
 			const payload = unwrap(await res.json());
-			if (Array.isArray(payload)) return payload as ManagedEvent[];
+			if (Array.isArray(payload)) return payload.map(mapBackendEvent);
 		}
 	} catch {
 		// Fallback to in-memory mock if backend unavailable
@@ -186,7 +245,7 @@ export async function getEventById(id: number): Promise<ManagedEvent> {
 		});
 		if (res.ok) {
 			const payload = unwrap(await res.json());
-			if (payload && typeof payload === 'object') return payload as ManagedEvent;
+			if (payload && typeof payload === 'object') return mapBackendEvent(payload as Record<string, any>);
 		}
 	} catch {
 		// Fallback to mock
@@ -222,7 +281,7 @@ export async function createEvent(data: EventFormData): Promise<ManagedEvent> {
 		});
 		if (res.ok) {
 			const payload = unwrap(await res.json());
-			if (payload && typeof payload === 'object') return payload as ManagedEvent;
+			if (payload && typeof payload === 'object') return mapBackendEvent(payload as Record<string, any>);
 		}
 	} catch {
 		// Fallback to mock update
@@ -249,7 +308,7 @@ export async function updateEvent(id: number, data: EventFormData): Promise<Mana
 		});
 		if (res.ok) {
 			const payload = unwrap(await res.json());
-			if (payload && typeof payload === 'object') return payload as ManagedEvent;
+			if (payload && typeof payload === 'object') return mapBackendEvent(payload as Record<string, any>);
 		}
 	} catch {
 		// Fallback to mock
@@ -286,26 +345,45 @@ export async function deleteEvent(id: number): Promise<boolean> {
 	return delay(true);
 }
 
+// be-eventgate (EVG-45) exposes one action endpoint per transition instead of a
+// generic PATCH .../status — map the target status to the right action route.
+const STATUS_ACTION: Partial<Record<EventStatus, string>> = {
+	pending_approval: 'submit',
+	approved: 'approve',
+	rejected: 'reject',
+	revision_requested: 'request-revision',
+	published: 'publish',
+	draft: 'unpublish'
+};
+
 /**
- * Update event status (e.g. submit for approval, publish, draft, approve, reject).
- * `reason` is required by the approval flow (EVG-46) when rejecting an event.
+ * Update event status (e.g. submit for approval, publish, approve, reject).
+ * `reason` is sent as `notes` — required by the backend for reject/request-revision.
  */
 export async function updateEventStatus(id: number, status: EventStatus, reason?: string): Promise<ManagedEvent> {
-	try {
-		const res = await fetch(`${ENV.API_BASE_URL}/events/${id}/status`, {
-			method: 'PATCH',
-			headers: {
-				'Content-Type': 'application/json',
-				...getAuthHeader()
-			},
-			body: JSON.stringify(reason ? { status, reject_reason: reason } : { status })
-		});
-		if (res.ok) {
-			const payload = unwrap(await res.json());
-			if (payload && typeof payload === 'object') return payload as ManagedEvent;
+	const action = STATUS_ACTION[status];
+
+	if (action) {
+		try {
+			const res = await fetch(`${ENV.API_BASE_URL}/events/${id}/${action}`, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					...getAuthHeader()
+				},
+				body: JSON.stringify({ notes: reason ?? '' })
+			});
+			if (res.ok) {
+				const payload = unwrap(await res.json());
+				if (payload && typeof payload === 'object') {
+					const mapped = mapBackendEvent(payload as Record<string, any>);
+					if (reason) mapped.reject_reason = reason;
+					return mapped;
+				}
+			}
+		} catch {
+			// Fallback to mock
 		}
-	} catch {
-		// Fallback to mock
 	}
 
 	const index = mockEvents.findIndex((e) => e.id === Number(id));

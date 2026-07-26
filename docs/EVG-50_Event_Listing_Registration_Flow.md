@@ -12,7 +12,7 @@
 | **Tech Stack** | Svelte 5, SvelteKit 2, TypeScript, TailwindCSS 4 |
 | **Author** | Frontend Development Team |
 | **Design Reference** | Tidak ada wireframe/high-fidelity (EVG-56) tersedia saat task ini dikerjakan — dibangun mengikuti pola UI `EventForm.svelte`/`event-management` (EVG-44) untuk konsistensi visual |
-| **Status** | Completed (Mock API) — Pending Backend Integration (EVG-49) |
+| **Status** | Completed — sisi baca (event & form pertanyaan) terhubung backend asli; submit registrasi masih mock, pending EVG-49 |
 
 ---
 
@@ -91,7 +91,8 @@ Banner, deskripsi, kategori, penyelenggara, jadwal, lokasi, harga tiket, tombol 
 
 ## 6. Known Gap — Backend & Skema Data
 
-1. **Backend EVG-49 (Participant Registration API) belum ada** — tidak ada dokumen/commit terkait di repo `be-eventgate`. `registrationApi.ts` sengaja mock, pola sama seperti service lain, tinggal disambungkan begitu backend siap.
+0. **Update:** backend EVG-47 (Dynamic Form Schema API) sudah rilis dan `formApi.ts` sudah disambungkan penuh (lihat dokumentasi EVG-48) — artinya sisi **baca** form registrasi di halaman ini (`formApi.listQuestions`) sekarang otomatis ikut memakai data pertanyaan asli, bukan mock, tanpa perubahan kode di halaman ini. Yang masih mock murni hanya langkah **submit**-nya (poin 1 di bawah), karena itu memang domain EVG-49, bukan EVG-47.
+1. **Backend EVG-49 (Participant Registration API) belum ada** — tidak ada dokumen/commit terkait di repo `be-eventgate` (dicek ulang, hanya EVG-45 dan EVG-47 yang sudah rilis). `registrationApi.ts` sengaja mock, pola sama seperti service lain, tinggal disambungkan begitu backend siap.
 2. **Tipe field `file_upload`** pada form pendaftaran mengikuti keterbatasan yang sama seperti dicatat di EVG-48: tidak ada penyimpanan file sungguhan (input hanya UI, jawabannya tidak ikut terkirim ke `registrationApi` saat ini).
 3. **Tidak ada halaman lookup status berdasarkan kode registrasi** (mis. "cek status pendaftaran saya" di kunjungan berikutnya) — di luar scope literal EVG-50 ("Menampilkan status pendaftaran" dipenuhi sebagai tampilan langsung setelah submit, bukan sebagai fitur pencarian ulang). Bisa ditambahkan sebagai tiket terpisah bila dibutuhkan.
 4. Mock data `eventApi.ts` saat ini tidak punya kombinasi event **published + berbayar**, sehingga jalur `pending_payment` diverifikasi lewat pembacaan kode (logika ternary sederhana berdasarkan `ticket_type`), bukan klik langsung di browser — dicatat agar tim QA (EVG-51) tahu untuk menambah data uji kombinasi tersebut.

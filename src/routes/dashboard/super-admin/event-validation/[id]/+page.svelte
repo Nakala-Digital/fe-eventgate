@@ -3,7 +3,7 @@
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { authStore, type AuthState } from '$lib/stores/authStore';
-	import { getEventById, updateEventStatus, type ManagedEvent } from '$lib/services/eventApi';
+	import { getEventById, updateEventStatus, getApprovalLogs, type ManagedEvent } from '$lib/services/eventApi';
 	import ConfirmActionModal from '$lib/components/common/ConfirmActionModal.svelte';
 	import { ArrowLeft, Calendar, MapPin, Image as ImageIcon } from 'lucide-svelte';
 
@@ -30,6 +30,12 @@
 		isLoading = true;
 		try {
 			event = await getEventById(eventId);
+			// Backend menyimpan alasan reject di approval log, bukan di objek event.
+			if (event && event.status === 'rejected' && !event.reject_reason) {
+				const logs = await getApprovalLogs(eventId);
+				const lastReject = [...logs].reverse().find((l) => l.action === 'rejected');
+				if (lastReject?.notes) event.reject_reason = lastReject.notes;
+			}
 		} catch {
 			event = null;
 		}

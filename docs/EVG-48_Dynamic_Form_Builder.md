@@ -11,14 +11,14 @@
 | **Feature** | Dynamic Form Builder Implementation |
 | **Tech Stack** | Svelte 5, SvelteKit 2, TypeScript, TailwindCSS 4 |
 | **Author** | Frontend Development Team |
-| **Design Reference** | Tidak ada wireframe/high-fidelity (EVG-55) yang tersedia saat task ini dikerjakan — dibangun mengikuti pola UI yang sudah ada di `EventForm.svelte` (EVG-44) untuk konsistensi visual |
-| **Status** | Completed (Mock API) — Pending Backend Integration (EVG-47) |
+| **Design Reference** | Tidak ada wireframe/high-fidelity (EVG-55) yang tersedia — dibangun mengikuti pola UI `EventForm.svelte` (EVG-44) untuk konsistensi visual |
+| **Status** | **Completed — fully connected to real backend** (EVG-47 Dynamic Form Schema API), verified end-to-end against `be-eventgate` running locally |
 
 ---
 
 ## 1. Executive Summary
 
-Task **EVG-48** mengimplementasikan halaman Form Builder bagi Admin Panitia untuk membuat, mengedit, menghapus, dan mengatur urutan pertanyaan pendaftaran dinamis per event, lengkap dengan preview form sederhana secara real-time.
+Task **EVG-48** mengimplementasikan halaman Form Builder bagi Admin Panitia untuk membuat, mengedit, menghapus, dan mengatur urutan pertanyaan pendaftaran dinamis per event, lengkap dengan preview form sederhana secara real-time. Backend EVG-47 (Dynamic Registration Form API, branch `feature/dynamic-form-schema` di `be-eventgate`) sudah tersedia dan halaman ini sudah disambungkan penuh.
 
 ---
 
@@ -29,10 +29,10 @@ fe-eventgate/
 ├── src/
 │   ├── lib/
 │   │   └── services/
-│   │       └── formApi.ts            # Data + CRUD pertanyaan dinamis (mock, swappable ke API asli)
+│   │       └── formApi.ts            # + mapBackendQuestion(), toBackendQuestionPayload()
 │   └── routes/
 │       └── dashboard/panitia/event-management/
-│           ├── +page.svelte          # Ditambah tombol "Form Builder" per baris event
+│           ├── +page.svelte          # Tombol "Form Builder" per baris event
 │           └── [id]/form-builder/
 │               └── +page.svelte      # Halaman form builder (list + form + preview)
 ```
@@ -42,51 +42,47 @@ fe-eventgate/
 ## 3. Core Components
 
 ### A. Form Service (`src/lib/services/formApi.ts`)
-Pola sama persis dengan `eventApi.ts` (real fetch + fallback mock in-memory + helper `unwrap()`):
-- `DynamicQuestion { id, event_id, label, type, requirement, options, order }`
-- Tipe field: `text, textarea, number, date, select, radio, checkbox, file_upload`
-- `requirement`: `wajib` | `opsional`
-- Fungsi: `listQuestions(eventId)`, `createQuestion`, `updateQuestion`, `deleteQuestion`, `reorderQuestion(eventId, questionId, 'up'|'down')`
+
+Backend EVG-47 memakai nama field dan endpoint yang berbeda dari asumsi mock awal — diselesaikan dengan **adapter di boundary**, bukan mengubah shape internal `DynamicQuestion` (jadi UI form-builder & registration form/EVG-50 tidak perlu berubah):
+
+| Internal (`DynamicQuestion`) | Backend asli (`QuestionRequest`/`QuestionResponse`) |
+| :--- | :--- |
+| `label` | `question_text` |
+| `type` (termasuk `'select'`) | `question_type` (termasuk `'dropdown'`) |
+| `requirement` | `requirement_type` |
+| `order` | `display_order` |
+| `options[].label` | `options[].option_label` + `option_value` |
+
+- `mapBackendQuestion(raw)` — response → internal shape.
+- `toBackendQuestionPayload(data, displayOrder?)` — internal form data → request body asli.
+- Endpoint asli dipakai: `GET/POST /api/events/{id}/questions`, `PUT/DELETE /api/events/{id}/questions/{questionID}`.
+- **Reorder** (`reorderQuestion`) kini menerima `currentList` dan melakukan 2× `PUT` (Replace-All strategy backend mensyaratkan body pertanyaan lengkap, bukan cuma `display_order`).
+- `requirement_type: 'kondisional'` (didukung penuh oleh backend, termasuk `depends_on_question_id`/`depends_on_value`) **sengaja tetap tidak diimplementasikan** di sisi UI — bukan bagian dari Scope Pekerjaan/Acceptance Criteria EVG-48; pertanyaan kondisional dari klien lain akan tampil sebagai `opsional` di halaman ini.
 
 ### B. Halaman Form Builder (`event-management/[id]/form-builder/+page.svelte`)
-- **Role guard**: hanya `panitia` dan `super-admin` (pola sama seperti halaman Event Management EVG-44), role lain redirect ke dashboard masing-masing.
-- **Daftar pertanyaan**: kartu per pertanyaan dengan badge tipe field & wajib/opsional, tombol naik/turun urutan, edit, hapus (via `ConfirmActionModal`).
-- **Form tambah/edit**: label, dropdown tipe field, toggle wajib/opsional, dan **option builder** dinamis (muncul otomatis untuk tipe `select`/`radio`/`checkbox`, validasi minimal 2 pilihan).
-- **Preview real-time**: merender ulang seluruh pertanyaan sebagai pratinjau form pendaftaran (field disabled), otomatis mengikuti urutan dan tipe field terbaru.
-- Tombol "Form Builder" (ikon hijau) ditambahkan di tabel Event Management (`event-management/+page.svelte`) di antara Edit dan Hapus.
+Tidak berubah secara struktural dari revisi sebelumnya (role guard, daftar pertanyaan, form tambah/edit, option builder, preview real-time) — hanya pemanggilan `reorderQuestion` disesuaikan untuk mengirim daftar pertanyaan saat ini.
 
 ---
 
-## 4. Behavior Summary
+## 4. Verifikasi End-to-End Terhadap Backend Asli
 
-| Aksi | Hasil |
+Dijalankan melawan `be-eventgate` (branch `feature/dynamic-form-schema`) di lokal, login sebagai `panitia@eventgate.com` (pemilik event):
+
+| Skenario | Hasil |
 | :--- | :--- |
-| Tambah pertanyaan tipe `select`/`radio`/`checkbox` tanpa ≥2 pilihan | Ditolak validasi frontend, pesan error tampil |
-| Tambah/edit pertanyaan valid | Tersimpan, muncul di daftar & preview |
-| Naik/turunkan urutan | Urutan daftar & preview berubah langsung |
-| Hapus pertanyaan | Modal konfirmasi → terhapus dari daftar & preview |
-| Akses halaman sebagai role selain panitia/super-admin | Redirect ke dashboard sesuai role |
+| Tambah pertanyaan tipe Dropdown + 2 opsi | ✅ Tersimpan — dikonfirmasi via query `dynamic_questions`/`question_options`: `question_type='dropdown'`, `option_label`/`option_value` benar |
+| Tambah pertanyaan kedua (Teks Singkat, opsional) | ✅ |
+| Naikkan urutan pertanyaan kedua | ✅ `display_order` kedua pertanyaan tertukar di database (ter-PUT ulang keduanya) |
+| Hapus pertanyaan | ✅ **Logical deletion** terverifikasi — row tetap ada di database dengan `is_active = false`, bukan terhapus fisik (sesuai desain backend) |
+| Preview form real-time | ✅ Mengikuti urutan & tipe field terbaru |
 
 ---
 
-## 5. Local Setup & Execution Guide
+## 5. Known Gap — Sisa Setelah Integrasi Penuh
 
-1. **Jalankan Dev Server**:
-   ```bash
-   npm run dev
-   ```
-2. **Login sebagai Admin Panitia** (`panitia@eventgate.com` / `Rahasia123!`), buka Event Management → klik ikon hijau (Form Builder) pada salah satu event.
-3. **Verifikasi Build**:
-   ```bash
-   npm run check
-   npm run build
-   ```
+1. **Tipe field `file_upload`** — backend EVG-47 mendukung `question_type = file_upload` di skema (mengikuti Task Brief/ERD, bukan enum lama EVG-40), tapi **tidak ada mekanisme upload/storage file** di backend manapun. Field ini tetap ada di UI (sesuai instruksi eksplisit sebelumnya) tapi jawabannya tidak akan pernah benar-benar tersimpan sebagai file.
+2. **Conditional Question** (`kondisional`, `depends_on_question_id`, `depends_on_value`) didukung penuh oleh backend tapi sengaja tidak dibangun di UI — di luar scope literal EVG-48. Bisa jadi tiket terpisah bila dibutuhkan.
 
----
-
-## 6. Known Gap — Backend & Skema Data
-
-1. **Backend EVG-47 (Dynamic Form Schema API) belum ada** — tidak ada dokumen maupun commit terkait di repo `be-eventgate` per tanggal dokumen ini dibuat. `formApi.ts` sengaja mock, mengikuti pola `eventApi.ts` (real fetch dulu, fallback mock) agar tinggal disambungkan begitu backend siap, tanpa mengubah halaman.
-2. **Tipe field `file_upload` tidak punya dukungan di skema database asli** — skema `dynamic_questions` pada `EVG-40_Database_Migration_Setup.md` hanya mendefinisikan enum tipe: `text, textarea, number, date, select, radio, checkbox` (tidak ada `file_upload`). Field ini tetap diimplementasikan di UI sesuai instruksi eksplisit (mengikuti scope literal tiket EVG-47/48), tapi backend perlu menambah kolom/strategi penyimpanan file sebelum ini bisa benar-benar berfungsi tersimpan.
-3. Field `kondisional` (conditional requirement) dan `depends_on_question_id` ada di skema DB tapi **sengaja tidak diimplementasikan** karena tidak disebut di Scope Pekerjaan/Acceptance Criteria EVG-48.
-4. Reorder pertanyaan diimplementasikan dengan tombol naik/turun (bukan drag-and-drop) untuk menghindari dependency baru — cukup untuk memenuhi acceptance criteria "urutan pertanyaan dapat disimpan".
+## 6. Catatan Scope & Desain
+- Reorder pertanyaan tetap pakai tombol naik/turun (bukan drag-and-drop) untuk menghindari dependency baru.
+- Desain masih mengikuti pola `EventForm.svelte` (EVG-44) karena EVG-55 (high-fidelity Form Builder) belum tersedia.
