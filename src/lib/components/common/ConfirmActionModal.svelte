@@ -19,7 +19,7 @@
 		requireReason = false,
 		reasonLabel = 'Alasan (wajib)',
 		confirmLabel,
-		confirmClass = 'bg-emerald-700 hover:bg-emerald-800',
+		confirmClass = 'bg-brand-700 hover:bg-brand-800',
 		isSubmitting = false,
 		onConfirm,
 		onCancel
@@ -60,7 +60,7 @@
 						bind:value={reason}
 						rows="3"
 						placeholder="Jelaskan alasannya..."
-						class="w-full text-xs border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-600"
+						class="w-full text-xs border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-600"
 					></textarea>
 					{#if validationError}
 						<p class="text-[11px] text-red-600">{validationError}</p>
