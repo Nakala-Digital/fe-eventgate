@@ -104,7 +104,7 @@
 
 	{#if isLoading}
 		<div class="bg-white border border-slate-200 rounded-xl p-12 text-center shadow-sm">
-			<Loader2 class="w-8 h-8 text-emerald-600 animate-spin mx-auto mb-3" />
+			<Loader2 class="w-8 h-8 text-brand-600 animate-spin mx-auto mb-3" />
 			<p class="text-xs font-semibold text-slate-700">Memuat formulir pendaftaran...</p>
 		</div>
 	{:else if notFound || !event}
@@ -115,7 +115,7 @@
 		<!-- Success / status state -->
 		<div class="bg-white border border-slate-200 rounded-xl p-8 text-center shadow-sm space-y-3">
 			{#if result.status === 'confirmed'}
-				<CheckCircle2 class="w-14 h-14 text-emerald-600 mx-auto" />
+				<CheckCircle2 class="w-14 h-14 text-brand-600 mx-auto" />
 				<h2 class="text-lg font-bold text-slate-900">Pendaftaran Berhasil!</h2>
 				<p class="text-xs text-slate-500">Kamu terdaftar untuk "{event.title}". Sampai jumpa di acaranya!</p>
 			{:else}
@@ -149,7 +149,7 @@
 					id="participant-name"
 					type="text"
 					bind:value={participantName}
-					class="w-full text-xs border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-600 {errors.participantName ? 'border-red-500' : 'border-slate-300'}"
+					class="w-full text-xs border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-600 {errors.participantName ? 'border-red-500' : 'border-slate-300'}"
 				/>
 				{#if errors.participantName}<p class="text-[11px] text-red-500">{errors.participantName}</p>{/if}
 			</div>
@@ -162,7 +162,7 @@
 					id="participant-email"
 					type="email"
 					bind:value={participantEmail}
-					class="w-full text-xs border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-600 {errors.participantEmail ? 'border-red-500' : 'border-slate-300'}"
+					class="w-full text-xs border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-600 {errors.participantEmail ? 'border-red-500' : 'border-slate-300'}"
 				/>
 				{#if errors.participantEmail}<p class="text-[11px] text-red-500">{errors.participantEmail}</p>{/if}
 			</div>
@@ -179,13 +179,13 @@
 							id={`q-${q.id}`}
 							bind:value={answerValues[q.id]}
 							rows="3"
-							class="w-full text-xs border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-600 {errors[`q_${q.id}`] ? 'border-red-500' : 'border-slate-300'}"
+							class="w-full text-xs border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-600 {errors[`q_${q.id}`] ? 'border-red-500' : 'border-slate-300'}"
 						></textarea>
 					{:else if q.type === 'select'}
 						<select
 							id={`q-${q.id}`}
 							bind:value={answerValues[q.id]}
-							class="w-full text-xs border rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600 {errors[`q_${q.id}`] ? 'border-red-500' : 'border-slate-300'}"
+							class="w-full text-xs border rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-brand-600 {errors[`q_${q.id}`] ? 'border-red-500' : 'border-slate-300'}"
 						>
 							<option value="">Pilih {q.label}</option>
 							{#each q.options as opt}
@@ -217,7 +217,7 @@
 							id={`q-${q.id}`}
 							type={q.type === 'number' ? 'number' : q.type === 'date' ? 'date' : 'text'}
 							bind:value={answerValues[q.id]}
-							class="w-full text-xs border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-600 {errors[`q_${q.id}`] ? 'border-red-500' : 'border-slate-300'}"
+							class="w-full text-xs border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-600 {errors[`q_${q.id}`] ? 'border-red-500' : 'border-slate-300'}"
 						/>
 					{/if}
 					{#if errors[`q_${q.id}`]}<p class="text-[11px] text-red-500">{errors[`q_${q.id}`]}</p>{/if}
@@ -233,7 +233,7 @@
 			<button
 				type="submit"
 				disabled={isSubmitting}
-				class="w-full text-xs font-bold text-white bg-emerald-700 hover:bg-emerald-800 disabled:opacity-60 px-4 py-2.5 rounded-lg shadow-sm"
+				class="w-full text-xs font-bold text-white bg-brand-700 hover:bg-brand-800 disabled:opacity-60 px-4 py-2.5 rounded-lg shadow-sm"
 			>
 				{isSubmitting ? 'Mengirim...' : 'Kirim Pendaftaran'}
 			</button>

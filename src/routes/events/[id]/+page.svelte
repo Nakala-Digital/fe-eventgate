@@ -48,7 +48,7 @@
 
 	{#if isLoading}
 		<div class="bg-white border border-slate-200 rounded-xl p-12 text-center shadow-sm">
-			<Loader2 class="w-8 h-8 text-emerald-600 animate-spin mx-auto mb-3" />
+			<Loader2 class="w-8 h-8 text-brand-600 animate-spin mx-auto mb-3" />
 			<p class="text-xs font-semibold text-slate-700">Memuat detail event...</p>
 		</div>
 	{:else if notFound || !event}
@@ -61,7 +61,7 @@
 			{#if event.banner_url}
 				<img src={event.banner_url} alt={event.title} class="w-full h-56 object-cover" />
 			{:else}
-				<div class="w-full h-56 bg-emerald-50 flex items-center justify-center text-emerald-700">
+				<div class="w-full h-56 bg-brand-50 flex items-center justify-center text-brand-700">
 					<Calendar class="w-16 h-16" />
 				</div>
 			{/if}
@@ -79,11 +79,11 @@
 
 				<div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs border-t border-slate-100 pt-4">
 					<div class="flex items-center gap-2 text-slate-600">
-						<Calendar class="w-4 h-4 text-emerald-700 shrink-0" />
+						<Calendar class="w-4 h-4 text-brand-700 shrink-0" />
 						{formatDateTime(event.start_date)} — {formatDateTime(event.end_date)}
 					</div>
 					<div class="flex items-center gap-2 text-slate-600">
-						<MapPin class="w-4 h-4 text-emerald-700 shrink-0" />
+						<MapPin class="w-4 h-4 text-brand-700 shrink-0" />
 						{event.location}
 					</div>
 				</div>
@@ -91,13 +91,13 @@
 				<div class="flex items-center justify-between border-t border-slate-100 pt-4">
 					<div>
 						<p class="text-[11px] text-slate-500">Biaya Tiket</p>
-						<p class="text-lg font-bold {event.ticket_type === 'gratis' ? 'text-emerald-700' : 'text-slate-900'}">
+						<p class="text-lg font-bold {event.ticket_type === 'gratis' ? 'text-brand-700' : 'text-slate-900'}">
 							{event.ticket_type === 'gratis' ? 'Gratis' : formatRupiah(event.price)}
 						</p>
 					</div>
 					<a
 						href={`/events/${event.id}/register`}
-						class="text-xs font-bold text-white bg-emerald-700 hover:bg-emerald-800 px-5 py-2.5 rounded-lg shadow-sm"
+						class="text-xs font-bold text-white bg-brand-700 hover:bg-brand-800 px-5 py-2.5 rounded-lg shadow-sm"
 					>
 						Daftar Sekarang
 					</a>

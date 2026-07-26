@@ -62,7 +62,7 @@
 	};
 	const statusClass: Record<string, string> = {
 		pending_approval: 'bg-amber-50 text-amber-700 border-amber-200',
-		approved: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+		approved: 'bg-brand-50 text-brand-700 border-brand-200',
 		rejected: 'bg-red-50 text-red-700 border-red-200'
 	};
 
@@ -118,7 +118,7 @@
 	{#if feedback}
 		<div
 			class="text-xs rounded-lg px-3 py-2 border {feedback.type === 'success'
-				? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+				? 'bg-brand-50 text-brand-800 border-brand-200'
 				: 'bg-red-50 text-red-700 border-red-200'}"
 		>
 			{feedback.message}
@@ -145,7 +145,7 @@
 	<div class="flex flex-wrap gap-3">
 		<select
 			bind:value={organizerFilter}
-			class="text-xs border border-slate-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600"
+			class="text-xs border border-slate-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-brand-600"
 		>
 			<option value="all">Semua Organizer</option>
 			{#each organizers as organizer}
@@ -154,7 +154,7 @@
 		</select>
 		<select
 			bind:value={statusFilter}
-			class="text-xs border border-slate-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600"
+			class="text-xs border border-slate-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-brand-600"
 		>
 			<option value="all">Semua Status</option>
 			<option value="pending_approval">Menunggu</option>
@@ -206,7 +206,7 @@
 										<button
 											onclick={() => openApprove(event)}
 											title="Approve"
-											class="p-1.5 rounded-lg hover:bg-emerald-50 text-emerald-700"
+											class="p-1.5 rounded-lg hover:bg-brand-50 text-brand-700"
 										>
 											<CheckCircle2 class="w-4 h-4" />
 										</button>
@@ -237,7 +237,7 @@
 	requireReason={modalMode === 'reject'}
 	reasonLabel="Alasan Penolakan (wajib)"
 	confirmLabel={modalMode === 'approve' ? 'Ya, Setujui' : 'Kirim Penolakan'}
-	confirmClass={modalMode === 'approve' ? 'bg-emerald-700 hover:bg-emerald-800' : 'bg-red-600 hover:bg-red-700'}
+	confirmClass={modalMode === 'approve' ? 'bg-brand-700 hover:bg-brand-800' : 'bg-red-600 hover:bg-red-700'}
 	{isSubmitting}
 	onConfirm={handleConfirm}
 	onCancel={closeModal}

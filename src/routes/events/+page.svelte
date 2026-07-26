@@ -64,12 +64,12 @@
 				type="text"
 				bind:value={searchQuery}
 				placeholder="Cari nama event atau lokasi..."
-				class="w-full text-xs border border-slate-300 rounded-lg pl-9 pr-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600"
+				class="w-full text-xs border border-slate-300 rounded-lg pl-9 pr-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-brand-600"
 			/>
 		</div>
 		<select
 			bind:value={categoryFilter}
-			class="text-xs border border-slate-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600"
+			class="text-xs border border-slate-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-brand-600"
 		>
 			<option value="all">Semua Kategori</option>
 			{#each categories as cat}
@@ -80,7 +80,7 @@
 
 	{#if isLoading}
 		<div class="bg-white border border-slate-200 rounded-xl p-12 text-center shadow-sm">
-			<Loader2 class="w-8 h-8 text-emerald-600 animate-spin mx-auto mb-3" />
+			<Loader2 class="w-8 h-8 text-brand-600 animate-spin mx-auto mb-3" />
 			<p class="text-xs font-semibold text-slate-700">Memuat daftar event...</p>
 		</div>
 	{:else if hasError}
@@ -110,7 +110,7 @@
 					{#if event.banner_url}
 						<img src={event.banner_url} alt={event.title} class="w-full h-36 object-cover" />
 					{:else}
-						<div class="w-full h-36 bg-emerald-50 flex items-center justify-center text-emerald-700">
+						<div class="w-full h-36 bg-brand-50 flex items-center justify-center text-brand-700">
 							<Calendar class="w-10 h-10" />
 						</div>
 					{/if}
@@ -127,7 +127,7 @@
 							<MapPin class="w-3.5 h-3.5 shrink-0" />
 							<span class="line-clamp-1">{event.location}</span>
 						</div>
-						<p class="text-sm font-bold {event.ticket_type === 'gratis' ? 'text-emerald-700' : 'text-slate-900'}">
+						<p class="text-sm font-bold {event.ticket_type === 'gratis' ? 'text-brand-700' : 'text-slate-900'}">
 							{event.ticket_type === 'gratis' ? 'Gratis' : formatRupiah(event.price)}
 						</p>
 					</div>

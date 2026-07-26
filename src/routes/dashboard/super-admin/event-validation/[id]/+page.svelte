@@ -53,7 +53,7 @@
 	const statusClass: Record<string, string> = {
 		draft: 'bg-slate-100 text-slate-600 border-slate-200',
 		pending_approval: 'bg-amber-50 text-amber-700 border-amber-200',
-		approved: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+		approved: 'bg-brand-50 text-brand-700 border-brand-200',
 		published: 'bg-blue-50 text-blue-700 border-blue-200',
 		rejected: 'bg-red-50 text-red-700 border-red-200',
 		ended: 'bg-slate-100 text-slate-500 border-slate-200'
@@ -100,7 +100,7 @@
 	{#if feedback}
 		<div
 			class="text-xs rounded-lg px-3 py-2 border {feedback.type === 'success'
-				? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+				? 'bg-brand-50 text-brand-800 border-brand-200'
 				: 'bg-red-50 text-red-700 border-red-200'}"
 		>
 			{feedback.message}
@@ -127,7 +127,7 @@
 				<div class="flex gap-2 shrink-0">
 					<button
 						onclick={() => (modalMode = 'approve')}
-						class="text-xs font-bold bg-emerald-700 hover:bg-emerald-800 text-white px-4 py-2 rounded-lg shadow"
+						class="text-xs font-bold bg-brand-700 hover:bg-brand-800 text-white px-4 py-2 rounded-lg shadow"
 					>
 						Approve
 					</button>
@@ -159,11 +159,11 @@
 			<div class="bg-white border border-slate-200 rounded-xl p-5 space-y-3">
 				<h2 class="text-sm font-bold text-slate-900">Tempat & Waktu</h2>
 				<div class="flex items-center gap-2 text-xs text-slate-600">
-					<Calendar class="w-4 h-4 text-emerald-700" />
+					<Calendar class="w-4 h-4 text-brand-700" />
 					{formatDateTime(event.start_date)} — {formatDateTime(event.end_date)}
 				</div>
 				<div class="flex items-center gap-2 text-xs text-slate-600">
-					<MapPin class="w-4 h-4 text-emerald-700" />
+					<MapPin class="w-4 h-4 text-brand-700" />
 					{event.location}
 				</div>
 			</div>
@@ -209,7 +209,7 @@
 	requireReason={modalMode === 'reject'}
 	reasonLabel="Alasan Penolakan (wajib)"
 	confirmLabel={modalMode === 'approve' ? 'Ya, Setujui' : 'Kirim Penolakan'}
-	confirmClass={modalMode === 'approve' ? 'bg-emerald-700 hover:bg-emerald-800' : 'bg-red-600 hover:bg-red-700'}
+	confirmClass={modalMode === 'approve' ? 'bg-brand-700 hover:bg-brand-800' : 'bg-red-600 hover:bg-red-700'}
 	{isSubmitting}
 	onConfirm={handleConfirm}
 	onCancel={() => (modalMode = null)}
