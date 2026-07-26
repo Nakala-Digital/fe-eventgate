@@ -64,7 +64,7 @@
 			<p class="text-xs text-slate-600">Portal tiket peserta dan antarmuka pemindaian QR code.</p>
 			<div class="flex gap-3 pt-1 text-xs font-medium">
 				<a href="/dashboard/peserta" class="text-emerald-700 hover:underline">Portal Peserta →</a>
-				<a href="/dashboard/field-staff" class="text-emerald-700 hover:underline">Operator Scanner →</a>
+				<a href="/auth/login/lapangan" class="text-emerald-700 hover:underline">Operator Scanner →</a>
 			</div>
 		</div>
 	</div>
