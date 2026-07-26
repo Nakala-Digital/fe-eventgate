@@ -29,6 +29,15 @@ interface BackendUser {
 
 export class LoginError extends Error {}
 
+// Backend (auth_handler.go) hanya mengembalikan 4 pesan ini — dipetakan ke Bahasa Indonesia
+// supaya sesuai desain (mis. state "Akun tidak aktif" pada Login/Login User/Error/Tidak Aktif.png).
+const BACKEND_ERROR_MAP: Record<string, string> = {
+	'invalid email or password': 'Email atau kata sandi salah.',
+	'account is inactive, please contact administrator': 'Akun Anda tidak aktif, silakan hubungi administrator.',
+	'email and password are required': 'Email dan kata sandi wajib diisi.',
+	'invalid request body': 'Terjadi kesalahan, coba lagi.'
+};
+
 export async function login(email: string, password: string): Promise<{ token: string; user: UserProfile }> {
 	try {
 		const res = await fetch(`${ENV.API_BASE_URL}/auth/login`, {
@@ -42,9 +51,9 @@ export async function login(email: string, password: string): Promise<{ token: s
 			return { token: data.token, user: toUserProfile(data.user) };
 		}
 
-		if (res.status === 401 || res.status === 403) {
-			const body = await res.json().catch(() => ({ error: 'Email atau kata sandi salah.' }));
-			throw new LoginError(body.error ?? 'Email atau kata sandi salah.');
+		if (res.status === 401 || res.status === 403 || res.status === 400) {
+			const body = await res.json().catch(() => ({ error: '' }));
+			throw new LoginError(BACKEND_ERROR_MAP[body.error] ?? 'Email atau kata sandi salah.');
 		}
 	} catch (err) {
 		if (err instanceof LoginError) throw err;
