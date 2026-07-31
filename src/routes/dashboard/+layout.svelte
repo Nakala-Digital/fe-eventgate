@@ -1,25 +1,30 @@
 <script lang="ts">
-	import { page } from '$app/state';
+	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
 	import Sidebar from '$lib/components/common/Sidebar.svelte';
-	import { authStore, setMockUserRole, type UserRole } from '$lib/stores/authStore';
-	import { Ticket } from 'lucide-svelte';
+	import { authStore, clearAuth, type AuthState } from '$lib/stores/authStore';
+	import { Ticket, LogOut } from 'lucide-svelte';
 
 	let { children } = $props();
 
-	let currentAuth = $state({ isAuthenticated: false, user: null as any });
+	let currentAuth = $state<AuthState>({ isAuthenticated: false, user: null, token: null });
 
 	authStore.subscribe((state) => {
 		currentAuth = state;
 	});
 
-	const currentRole = $derived.by(() => {
-		const path = page.url.pathname;
-		if (path.includes('super-admin')) return 'super-admin';
-		if (path.includes('panitia')) return 'panitia';
-		if (path.includes('peserta')) return 'peserta';
-		if (path.includes('field-staff')) return 'field-staff';
-		return currentAuth.user?.role || 'super-admin';
+	onMount(() => {
+		if (!currentAuth.isAuthenticated) {
+			goto('/auth/login');
+		}
 	});
+
+	function handleLogout() {
+		clearAuth();
+		goto('/auth/login');
+	}
+
+	const currentRole = $derived(currentAuth.user?.role ?? 'super-admin');
 </script>
 
 <div class="min-h-screen bg-slate-50 text-slate-900 flex flex-col">
@@ -35,27 +40,20 @@
 		</div>
 
 		<div class="flex items-center gap-3 text-xs">
-			<span class="text-[11px] text-slate-500 font-medium">Pilih Role:</span>
-			<select
-				class="bg-slate-50 border border-slate-300 text-xs text-emerald-800 font-semibold rounded px-2.5 py-1 focus:ring-2 focus:ring-emerald-600 focus:outline-none"
-				value={currentRole}
-				onchange={(e) => {
-					const val = (e.target as HTMLSelectElement).value as UserRole;
-					setMockUserRole(val);
-					window.location.href = `/dashboard/${val}`;
-				}}
+			<span class="text-slate-700 font-semibold">{currentAuth.user?.name}</span>
+			<button
+				onclick={handleLogout}
+				class="flex items-center gap-1.5 text-slate-500 hover:text-red-600 font-medium px-2.5 py-1 rounded hover:bg-red-50 transition-colors"
 			>
-				<option value="super-admin">Super Admin</option>
-				<option value="panitia">Admin Panitia</option>
-				<option value="peserta">Peserta</option>
-				<option value="field-staff">Staf Lapangan</option>
-			</select>
+				<LogOut class="w-3.5 h-3.5" />
+				Keluar
+			</button>
 		</div>
 	</header>
 
 	<!-- Main Body with Sidebar -->
 	<div class="flex-1 flex">
-		<Sidebar role={currentRole as UserRole} />
+		<Sidebar role={currentRole} />
 
 		<main class="flex-1 p-6 overflow-y-auto bg-slate-50">
 			{@render children()}

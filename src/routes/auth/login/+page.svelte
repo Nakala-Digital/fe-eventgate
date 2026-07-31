@@ -1,16 +1,30 @@
 <script lang="ts">
-	import { setMockUserRole, type UserRole } from '$lib/stores/authStore';
 	import { goto } from '$app/navigation';
-	import { Ticket } from 'lucide-svelte';
+	import { setAuth } from '$lib/stores/authStore';
+	import { login, LoginError } from '$lib/services/authApi';
+	import { Ticket, Mail, Lock, Eye, EyeOff } from 'lucide-svelte';
 
-	let email = $state('user@eventgate.id');
-	let password = $state('password123');
-	let selectedRole = $state<UserRole>('super-admin');
+	let email = $state('');
+	let password = $state('');
+	let remember = $state(false);
+	let showPassword = $state(false);
+	let errorMessage = $state('');
+	let isSubmitting = $state(false);
 
-	function handleLogin(e: Event) {
+	async function handleLogin(e: Event) {
 		e.preventDefault();
-		setMockUserRole(selectedRole);
-		goto(`/dashboard/${selectedRole}`);
+		errorMessage = '';
+		isSubmitting = true;
+
+		try {
+			const { token, user } = await login(email, password);
+			setAuth(token, user, remember);
+			await goto(`/dashboard/${user.role}`);
+		} catch (err) {
+			errorMessage = err instanceof LoginError ? err.message : 'Terjadi kesalahan, coba lagi.';
+		} finally {
+			isSubmitting = false;
+		}
 	}
 </script>
 
@@ -19,95 +33,81 @@
 </svelte:head>
 
 <div class="py-12 px-4 flex items-center justify-center min-h-[calc(100vh-140px)]">
-	<div class="bg-white rounded-2xl max-w-4xl w-full border border-slate-200 shadow-xl overflow-hidden grid grid-cols-1 md:grid-cols-2">
-		<!-- Left Form Section (Matching wireframe/image.png) -->
-		<div class="p-8 space-y-6 flex flex-col justify-between">
-			<div class="space-y-4">
-				<div class="flex items-center gap-2">
-					<div class="h-7 w-7 rounded bg-emerald-700 flex items-center justify-center text-white">
-						<Ticket class="w-4 h-4" />
-					</div>
-					<span class="font-bold text-sm text-slate-900">EventGate</span>
-				</div>
-
-				<div class="space-y-1">
-					<h1 class="text-xl font-bold text-slate-900">Masuk ke Portal Penyelenggara</h1>
-					<p class="text-xs text-slate-500">Pusat kontrol untuk mengelola seluruh rangkaian acara terintegrasi.</p>
-				</div>
-
-				<!-- Role Toggle Tabs -->
-				<div class="bg-slate-100 p-1 rounded-xl flex items-center gap-1 text-xs">
-					<button
-						type="button"
-						class="flex-1 py-1.5 rounded-lg font-semibold transition-colors {selectedRole === 'super-admin' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'text-slate-600 hover:text-slate-900'}"
-						onclick={() => (selectedRole = 'super-admin')}
-					>
-						Super Admin
-					</button>
-					<button
-						type="button"
-						class="flex-1 py-1.5 rounded-lg font-semibold transition-colors {selectedRole === 'panitia' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'text-slate-600 hover:text-slate-900'}"
-						onclick={() => (selectedRole = 'panitia')}
-					>
-						Admin
-					</button>
-				</div>
-
-				<form onsubmit={handleLogin} class="space-y-3 pt-2">
-					<div class="space-y-1">
-						<label for="email" class="text-[11px] font-bold text-slate-600 uppercase">EMAIL</label>
-						<input
-							type="email"
-							id="email"
-							bind:value={email}
-							placeholder="Masukkan email Anda"
-							required
-							class="w-full bg-slate-50 border border-slate-300 text-xs rounded-xl px-3 py-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600"
-						/>
-					</div>
-
-					<div class="space-y-1">
-						<div class="flex justify-between items-center">
-							<label for="password" class="text-[11px] font-bold text-slate-600 uppercase">KATA SANDI</label>
-							<a href="#lupa" class="text-[10px] text-emerald-700 hover:underline">Lupa kata sandi?</a>
-						</div>
-						<input
-							type="password"
-							id="password"
-							bind:value={password}
-							placeholder="Masukkan kata sandi Anda"
-							required
-							class="w-full bg-slate-50 border border-slate-300 text-xs rounded-xl px-3 py-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600"
-						/>
-					</div>
-
-					<button
-						type="submit"
-						class="w-full text-xs font-bold bg-emerald-700 hover:bg-emerald-800 text-white py-3 rounded-xl transition-all mt-3 shadow"
-					>
-						Masuk
-					</button>
-				</form>
+	<div class="bg-white rounded-2xl max-w-sm w-full border border-slate-200 shadow-xl p-8 space-y-6">
+		<div class="flex flex-col items-center text-center space-y-2">
+			<div class="h-14 w-14 rounded-2xl bg-emerald-700 flex items-center justify-center text-white">
+				<Ticket class="w-7 h-7" />
 			</div>
-
-			<div class="text-center text-[11px] text-slate-500 border-t border-slate-100 pt-3">
-				Mengalami Kendala? <a href="#help" class="text-emerald-700 font-bold hover:underline">Hubungi Kami</a>
-			</div>
+			<span class="font-bold text-slate-900">EventGate</span>
 		</div>
 
-		<!-- Right Green Banner (Matching wireframe/image.png right side) -->
-		<div class="bg-emerald-800 p-8 text-white hidden md:flex flex-col justify-center space-y-4 relative overflow-hidden">
-			<div class="space-y-2 relative z-10">
-				<span class="text-[10px] bg-emerald-900/60 text-emerald-200 border border-emerald-600/40 px-2.5 py-1 rounded-full uppercase font-bold">
-					EventGate System
-				</span>
-				<h2 class="text-2xl font-extrabold leading-tight">
-					Mulai langkah baru menuju masa depan.
-				</h2>
-				<p class="text-xs text-emerald-100 opacity-90 leading-relaxed">
-					Sistem manajemen event terintegrasi untuk pengelolaan peserta, pendaftaran dinamis, dan verifikasi QR ticket.
-				</p>
+		<div class="text-center space-y-1">
+			<h1 class="text-xl font-bold text-emerald-700">Selamat Datang Kembali</h1>
+			<p class="text-xs text-slate-500">Masuk untuk mengelola kegiatan Anda</p>
+		</div>
+
+		{#if errorMessage}
+			<p class="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{errorMessage}</p>
+		{/if}
+
+		<form onsubmit={handleLogin} class="space-y-4">
+			<div class="space-y-1">
+				<label for="email" class="text-[11px] font-bold text-slate-600 uppercase">Email</label>
+				<div class="relative">
+					<Mail class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+					<input
+						type="email"
+						id="email"
+						bind:value={email}
+						placeholder="Masukkan email Anda"
+						required
+						class="w-full bg-slate-50 border border-slate-300 text-xs rounded-xl pl-9 pr-3 py-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600"
+					/>
+				</div>
 			</div>
+
+			<div class="space-y-1">
+				<div class="flex justify-between items-center">
+					<label for="password" class="text-[11px] font-bold text-slate-600 uppercase">Kata Sandi</label>
+					<a href="#lupa" class="text-[10px] text-emerald-700 hover:underline">Lupa Password?</a>
+				</div>
+				<div class="relative">
+					<Lock class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+					<input
+						type={showPassword ? 'text' : 'password'}
+						id="password"
+						bind:value={password}
+						placeholder="Masukkan kata sandi Anda"
+						required
+						class="w-full bg-slate-50 border border-slate-300 text-xs rounded-xl pl-9 pr-9 py-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600"
+					/>
+					<button
+						type="button"
+						class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+						onclick={() => (showPassword = !showPassword)}
+						aria-label={showPassword ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'}
+					>
+						{#if showPassword}<EyeOff class="w-4 h-4" />{:else}<Eye class="w-4 h-4" />{/if}
+					</button>
+				</div>
+			</div>
+
+			<label class="flex items-center gap-2 text-xs text-slate-600">
+				<input type="checkbox" bind:checked={remember} class="rounded border-slate-300 text-emerald-700 focus:ring-emerald-600" />
+				Ingatkan Akun Saya
+			</label>
+
+			<button
+				type="submit"
+				disabled={isSubmitting}
+				class="w-full text-xs font-bold bg-emerald-700 hover:bg-emerald-800 disabled:opacity-60 text-white py-3 rounded-xl transition-all shadow"
+			>
+				{isSubmitting ? 'Memproses...' : 'Masuk'}
+			</button>
+		</form>
+
+		<div class="text-center text-[11px] text-slate-500 border-t border-slate-100 pt-3">
+			Belum Punya Akun? <a href="#hubungi-admin" class="text-emerald-700 font-bold hover:underline">Hubungi Admin</a>
 		</div>
 	</div>
 </div>

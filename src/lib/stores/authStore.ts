@@ -1,6 +1,7 @@
 import { writable } from 'svelte/store';
+import { browser } from '$app/environment';
 
-export type UserRole = 'super-admin' | 'panitia' | 'peserta' | 'field-staff' | 'guest';
+export type UserRole = 'super-admin' | 'panitia' | 'peserta' | 'field-staff';
 
 export interface UserProfile {
 	id: string;
@@ -13,36 +14,38 @@ export interface UserProfile {
 export interface AuthState {
 	isAuthenticated: boolean;
 	user: UserProfile | null;
+	token: string | null;
 }
 
-const initialAuth: AuthState = {
-	isAuthenticated: false,
-	user: null
-};
+const STORAGE_KEY = 'eventgate.auth';
 
-export const authStore = writable<AuthState>(initialAuth);
+function readStoredAuth(): AuthState {
+	const empty: AuthState = { isAuthenticated: false, user: null, token: null };
+	if (!browser) return empty;
 
-export const setMockUserRole = (role: UserRole) => {
-	if (role === 'guest') {
-		authStore.set({ isAuthenticated: false, user: null });
-		return;
+	const raw = localStorage.getItem(STORAGE_KEY) ?? sessionStorage.getItem(STORAGE_KEY);
+	if (!raw) return empty;
+
+	try {
+		return JSON.parse(raw) as AuthState;
+	} catch {
+		return empty;
 	}
+}
 
-	const roleNames: Record<UserRole, string> = {
-		'super-admin': 'Super Administrator',
-		'panitia': 'Admin Panitia Event',
-		'peserta': 'Peserta Event',
-		'field-staff': 'Staf Lapangan (Scan QR)',
-		'guest': 'Tamu'
-	};
+export const authStore = writable<AuthState>(readStoredAuth());
 
-	authStore.set({
-		isAuthenticated: true,
-		user: {
-			id: `user-${role}-001`,
-			name: roleNames[role],
-			email: `${role}@eventgate.id`,
-			role: role
-		}
-	});
-};
+export function setAuth(token: string, user: UserProfile, remember: boolean) {
+	const state: AuthState = { isAuthenticated: true, user, token };
+	authStore.set(state);
+
+	const storage = remember ? localStorage : sessionStorage;
+	storage.setItem(STORAGE_KEY, JSON.stringify(state));
+	(remember ? sessionStorage : localStorage).removeItem(STORAGE_KEY);
+}
+
+export function clearAuth() {
+	authStore.set({ isAuthenticated: false, user: null, token: null });
+	localStorage.removeItem(STORAGE_KEY);
+	sessionStorage.removeItem(STORAGE_KEY);
+}
