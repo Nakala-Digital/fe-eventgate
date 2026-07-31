@@ -11,13 +11,13 @@
 | **Feature** | Login Page & Role-Based Navigation |
 | **Tech Stack** | Svelte 5, SvelteKit 2, TypeScript, TailwindCSS 4 |
 | **Author** | Frontend Development Team |
-| **Status** | Completed (Mock Auth) — Pending Backend Integration (EVG-41) |
+| **Status** | Completed — Connected to real Auth API (EVG-41), verified against local backend |
 
 ---
 
 ## 1. Executive Summary
 
-Task **EVG-42** mengimplementasikan halaman login dan navigasi berbasis role pada frontend EventGate, menggantikan mock role-switcher dari EVG-39 dengan alur autentikasi yang sesungguhnya: form login, penyimpanan sesi, route guard pada dashboard, dan redirect otomatis sesuai role setelah login berhasil.
+Task **EVG-42** mengimplementasikan halaman login dan navigasi berbasis role pada frontend EventGate. Awalnya dibangun dengan mock auth (backend EVG-41 belum ada konfirmasi selesai saat itu); setelah EVG-41 rilis, `authApi.ts` disambungkan ke endpoint asli (`POST /api/auth/login`) dan diverifikasi end-to-end melawan backend `be-eventgate` yang dijalankan lokal.
 
 ---
 
@@ -25,18 +25,20 @@ Task **EVG-42** mengimplementasikan halaman login dan navigasi berbasis role pad
 
 ```text
 fe-eventgate/
+├── .env                               # PUBLIC_API_BASE_URL -> http://localhost:8080/api (lihat Bagian 6)
 ├── src/
 │   ├── lib/
 │   │   ├── services/
-│   │   │   └── authApi.ts            # Login service (mock, swappable ke API asli)
+│   │   │   └── authApi.ts            # Login service: real API + fallback mock jika backend unreachable
 │   │   ├── stores/
-│   │   │   └── authStore.ts          # AuthState + persistensi token (local/sessionStorage)
+│   │   │   └── authStore.ts          # UserRole (+school-reviewer) + persistensi token
 │   │   └── components/common/
-│   │       └── Navbar.svelte         # Diperbarui: tombol Masuk/Dashboard sesuai status login
+│   │       ├── Navbar.svelte         # Tombol Masuk/Dashboard sesuai status login
+│   │       └── Sidebar.svelte        # + nav item untuk role school-reviewer
 │   └── routes/
-│       ├── auth/login/+page.svelte   # UI login baru (email, password, remember me)
-│       └── dashboard/+layout.svelte  # Route guard + info user & logout
-├── .claude/launch.json               # Konfigurasi dev server untuk preview
+│       ├── auth/login/+page.svelte   # UI login (email, password, remember me)
+│       ├── dashboard/+layout.svelte  # Route guard + info user & logout
+│       └── dashboard/school-reviewer/+page.svelte  # Placeholder dashboard role baru (lihat Bagian 5)
 ```
 
 ---
@@ -44,26 +46,33 @@ fe-eventgate/
 ## 3. Core Components
 
 ### A. Auth Service (`src/lib/services/authApi.ts`)
-Fungsi `login(email, password)` — saat ini mock (menunggu backend Auth API EVG-41), dengan 4 akun demo satu per role. Diarsitektur sebagai satu fungsi terpisah agar mudah diganti dengan `fetch` ke endpoint backend asli tanpa mengubah halaman login.
+`login(email, password)` memanggil `POST {API_BASE_URL}/auth/login` sungguhan. Response sukses (`{token, user: {id, username, email, role_name, is_active}}`) dipetakan ke `UserProfile` internal via `ROLE_NAME_MAP`. Error 401/403 dari backend diteruskan sebagai `LoginError` dengan pesan asli. Jika `fetch` gagal total (backend tidak jalan), fallback ke 4 akun demo in-memory yang meniru data seed backend (`cmd/seeduser`) agar development tetap bisa jalan offline.
 
-Demo accounts (password: `password123`):
+**Role mapping** (`role_name` backend snake_case → `UserRole` frontend):
+| Backend `role_name` | Frontend `UserRole` | Bisa Login? |
+| :--- | :--- | :--- |
+| `super_admin` | `super-admin` | Ya |
+| `admin_panitia` | `panitia` | Ya |
+| `staf_lapangan` | `field-staff` | Ya |
+| `school_reviewer` | `school-reviewer` | Ya |
+| `peserta` | *(tidak ada mapping)* | **Tidak** — dikonfirmasi resmi oleh RBAC Matrix EVG-41: peserta terdaftar via guest registration, tidak punya akun/password. |
+
+Demo accounts (fallback offline, password: `Rahasia123!`, sama seperti seed backend):
 | Email | Role |
 | :--- | :--- |
-| superadmin@eventgate.id | super-admin |
-| panitia@eventgate.id | panitia |
-| peserta@eventgate.id | peserta |
-| staff@eventgate.id | field-staff |
+| superadmin@eventgate.com | super-admin |
+| panitia@eventgate.com | panitia |
+| staf@eventgate.com | field-staff |
+| reviewer@eventgate.com | school-reviewer |
 
 ### B. Auth Store (`src/lib/stores/authStore.ts`)
-- `setAuth(token, user, remember)` — menyimpan sesi ke `localStorage` (jika "Ingatkan Akun Saya" dicentang) atau `sessionStorage`.
-- `clearAuth()` — logout, membersihkan kedua storage.
-- State di-*hydrate* dari storage saat store diinisialisasi sehingga sesi bertahan setelah refresh.
+`UserRole` ditambah `'school-reviewer'` (role baru yang ditemukan di EVG-41, tidak ada di ticket Sprint 2 asli). `setAuth`/`clearAuth`/persistensi storage tidak berubah dari implementasi sebelumnya.
 
-### C. Login Page (`src/routes/auth/login/+page.svelte`)
-Form email + password dengan toggle show/hide password, checkbox "Ingatkan Akun Saya", dan pesan error inline saat kredensial salah. Setelah sukses, redirect ke `/dashboard/{role}` sesuai role dari hasil login.
+### C. Login Page & Route Guard
+Tidak berubah secara struktural dari versi sebelumnya — hanya mengonsumsi `authApi.ts` yang sekarang nyambung ke backend asli.
 
-### D. Route Guard (`src/routes/dashboard/+layout.svelte`)
-`onMount` mengecek `authStore`; jika belum login, redirect ke `/auth/login`. Header dashboard menampilkan nama user yang sedang login dan tombol logout (menggantikan dropdown "Pilih Role" dari EVG-39 yang memungkinkan akses tanpa login).
+### D. Placeholder Dashboard `school-reviewer` (baru)
+Role `school_reviewer` bisa login di backend tapi sebelumnya tidak punya tujuan redirect sama sekali di frontend (akan 404). Ditambahkan halaman placeholder + nav Sidebar minimal agar login role ini tidak error — **belum ada desain/spesifikasi UI resmi**, perlu dikonfirmasi ke PM/UI-UX sebelum dikembangkan lebih lanjut (lihat Bagian 5).
 
 ---
 
@@ -78,31 +87,25 @@ Form email + password dengan toggle show/hide password, checkbox "Ingatkan Akun 
 
 ---
 
-## 5. Local Setup & Execution Guide
+## 5. Temuan Baru: Role `school_reviewer` Belum Punya Spesifikasi UI
 
-### Quickstart Execution
+Backend EVG-41 mendefinisikan 5 role, bukan 4 seperti draft ticket Sprint 2 (`Super Admin, Admin Panitia, Peserta, Staf Lapangan`). Role kelima, `school_reviewer`, disiapkan backend untuk *hierarchical approval workflow* tapi:
+- Tidak disebut di ticket EVG-42/46 manapun.
+- Tidak ada di EVG-52 (High Fidelity Design – Authentication) atau EVG-54 (Event Approval) scope.
 
-1. **Jalankan Dev Server**:
-   ```bash
-   npm run dev
-   ```
-   Akses di browser: `http://localhost:5173/auth/login`
-
-2. **Login dengan akun demo** (lihat tabel akun demo di atas), lalu verifikasi redirect ke dashboard sesuai role dan tombol logout berfungsi.
-
-3. **Verifikasi Build**:
-   ```bash
-   npm run check
-   npm run build
-   ```
+Untuk sementara, user dengan role ini diarahkan ke placeholder kosong. **Perlu keputusan PM**: apakah role ini akan benar-benar dipakai Sprint 2 (butuh ticket UI baru) atau disimpan untuk sprint mendatang.
 
 ---
 
-## 6. Known Gap — Belum Terhubung ke Backend
+## 6. Bug Backend yang Ditemukan Saat Verifikasi (untuk diteruskan ke tim BE)
 
-Scope item **"Menghubungkan login frontend ke API auth"** dan Expected Output **"Login frontend terhubung dengan backend"** pada tiket **belum terpenuhi** per tanggal dokumen ini dibuat. Konfirmasi ke tim: EVG-41 (Backend Auth & RBAC, PIC Hanif) **belum selesai/belum ada konfirmasi** saat EVG-42 ini dikerjakan, sehingga `authApi.ts` sengaja dibuat mock (4 akun demo, lihat bagian 3.A) agar UI, route guard, dan redirect role tetap bisa diverifikasi tanpa menunggu backend.
+Saat menjalankan `be-eventgate` secara lokal untuk verifikasi integrasi, ditemukan beberapa bug:
 
-**Tindak lanjut**: begitu EVG-41 rilis dengan endpoint login yang jelas, ganti isi fungsi `login()` di `authApi.ts` dengan `fetch` ke endpoint tersebut — tidak perlu mengubah halaman login, store, atau route guard.
+1. **Routing `/api/v1/*` rusak** — `internal/delivery/http/router.go` mendaftarkan sub-route khusus `/api/v1` yang isinya cuma `/health`, sehingga menghalangi (shadow) router auth/event yang di-mount setelahnya untuk prefix yang sama. Hanya `/api/v1/health` yang bisa diakses; endpoint lain (`login`, `me`, `events`) hanya bisa lewat prefix `/api` polos (tanpa `/v1`). **Frontend saat ini di-set memakai `/api`** (lihat `.env` dan `src/lib/config/env.ts`) sebagai workaround — revert ke `/api/v1` setelah backend memperbaiki ini.
+2. **`go run main.go` crash di database fresh** — `internal/database/database.go`'s `Migrate()` (GORM `AutoMigrate`) mengasumsikan nama constraint yang tidak sesuai dengan yang dibuat migration SQL manual (`roles_role_name_key` vs `uni_roles_role_name`, juga untuk `users.username`, `users.email`, `events.slug`). Anggota tim yang mengikuti Quickstart README akan mengalami crash yang sama sampai ini diperbaiki.
+3. **Response envelope tidak konsisten** — `/health` dibungkus `{success, message, data}`, tapi `/auth/login`, `/auth/me`, `/events` mengembalikan JSON polos. Sudah diperbaiki di sisi frontend (`eventApi.ts`, lihat dokumentasi EVG-46) dengan helper `unwrap()`, tapi backend sebaiknya konsisten di semua endpoint.
 
-## 7. Catatan untuk Sprint Berikutnya
-- Role & Permission Matrix (EVG-27, sudah di-approve) menetapkan bahwa **Peserta menggunakan guest registration dan tidak memiliki akun login**; skema database EVG-40 juga sudah mengonfirmasi hal ini (tabel `participants` terpisah dari `users`, tanpa kolom password). Opsi login "peserta" pada implementasi saat ini bersifat sementara mengikuti draft tiket Sprint 2 dan sebaiknya dikonfirmasi ulang ke PM sebelum sprint berikutnya.
+**Tindak lanjut**: laporkan ke Hanif/tim backend — item #1 dan #2 blocking untuk semua orang yang setup ulang dari clean database.
+
+## 7. Catatan Lama (sudah terkonfirmasi resmi)
+Role & Permission Matrix EVG-41 mengonfirmasi **Peserta tidak memiliki akun login** (guest registration only) — sudah ditangani di Bagian 3.A (tidak ada mapping role peserta untuk login).

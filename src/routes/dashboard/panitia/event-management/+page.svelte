@@ -16,6 +16,7 @@
 		Calendar,
 		MapPin,
 		Edit3,
+		ListChecks,
 		Trash2,
 		Loader2,
 		AlertCircle,
@@ -94,6 +95,7 @@
 		draft: 'Draft',
 		pending_approval: 'Menunggu Approval',
 		approved: 'Disetujui',
+		revision_requested: 'Perlu Revisi',
 		published: 'Dipublikasikan',
 		rejected: 'Ditolak',
 		ended: 'Selesai'
@@ -103,6 +105,7 @@
 		draft: 'bg-slate-100 text-slate-700 border-slate-300',
 		pending_approval: 'bg-amber-50 text-amber-700 border-amber-200',
 		approved: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+		revision_requested: 'bg-orange-50 text-orange-700 border-orange-200',
 		published: 'bg-blue-50 text-blue-700 border-blue-200',
 		rejected: 'bg-red-50 text-red-700 border-red-200',
 		ended: 'bg-gray-100 text-gray-600 border-gray-300'
@@ -394,6 +397,15 @@
 											<Globe class="w-3 h-3" /> Publish
 										</button>
 									{/if}
+
+									<!-- Form Builder -->
+									<button
+										onclick={() => goto(`/dashboard/panitia/event-management/${event.id}/form-builder`)}
+										title="Form Builder"
+										class="p-1.5 rounded-lg text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 transition"
+									>
+										<ListChecks class="w-3.5 h-3.5" />
+									</button>
 
 									<!-- Edit -->
 									<button

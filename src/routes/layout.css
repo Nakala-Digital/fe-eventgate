@@ -1,5 +1,21 @@
 @import 'tailwindcss';
 
+/* Brand palette extracted from Design Sprint 2 EventGate_Nakala (Login/Penyelenggara.png,
+   Herro banner.png) — pixel-sampled hex values at 50/200/500/700/950; other steps interpolated. */
+@theme {
+	--color-brand-50: #deffef;
+	--color-brand-100: #c6f7de;
+	--color-brand-200: #a8f0c8;
+	--color-brand-300: #6ee0a8;
+	--color-brand-400: #3bc988;
+	--color-brand-500: #0b9e52;
+	--color-brand-600: #06883f;
+	--color-brand-700: #007a3d;
+	--color-brand-800: #026030;
+	--color-brand-900: #024124;
+	--color-brand-950: #01391e;
+}
+
 @layer utilities {
   .light-card {
     background: #ffffff;

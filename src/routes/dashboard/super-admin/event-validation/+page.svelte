@@ -2,9 +2,13 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { authStore, type AuthState } from '$lib/stores/authStore';
-	import { listEvents, approveEvent, rejectEvent, type ApprovalEvent } from '$lib/services/approvalApi';
+	import { listEvents, updateEventStatus, type ManagedEvent } from '$lib/services/eventApi';
 	import ConfirmActionModal from '$lib/components/common/ConfirmActionModal.svelte';
 	import { Eye, CheckCircle2, XCircle, Loader2 } from 'lucide-svelte';
+
+	// Halaman ini hanya menampilkan event yang sudah melewati alur approval
+	// (draft/published/ended dikelola di halaman Event Management, EVG-44).
+	const APPROVAL_STATUSES = ['pending_approval', 'approved', 'rejected'] as const;
 
 	let currentAuth = $state<AuthState>({ isAuthenticated: false, user: null, token: null });
 	authStore.subscribe((state) => (currentAuth = state));
@@ -17,7 +21,7 @@
 		}
 	});
 
-	let events = $state<ApprovalEvent[]>([]);
+	let events = $state<ManagedEvent[]>([]);
 	let isLoading = $state(true);
 	let feedback = $state<{ type: 'success' | 'error'; message: string } | null>(null);
 
@@ -25,12 +29,13 @@
 	let statusFilter = $state<'all' | 'pending_approval' | 'approved' | 'rejected'>('all');
 
 	let modalMode = $state<'approve' | 'reject' | null>(null);
-	let modalEvent = $state<ApprovalEvent | null>(null);
+	let modalEvent = $state<ManagedEvent | null>(null);
 	let isSubmitting = $state(false);
 
 	async function refreshList() {
 		isLoading = true;
-		events = await listEvents();
+		const all = await listEvents();
+		events = all.filter((e) => APPROVAL_STATUSES.includes(e.status as (typeof APPROVAL_STATUSES)[number]));
 		isLoading = false;
 	}
 
@@ -50,14 +55,14 @@
 		rejected: events.filter((e) => e.status === 'rejected').length
 	});
 
-	const statusLabel: Record<ApprovalEvent['status'], string> = {
+	const statusLabel: Record<string, string> = {
 		pending_approval: 'Menunggu',
 		approved: 'Disetujui',
 		rejected: 'Ditolak'
 	};
-	const statusClass: Record<ApprovalEvent['status'], string> = {
+	const statusClass: Record<string, string> = {
 		pending_approval: 'bg-amber-50 text-amber-700 border-amber-200',
-		approved: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+		approved: 'bg-brand-50 text-brand-700 border-brand-200',
 		rejected: 'bg-red-50 text-red-700 border-red-200'
 	};
 
@@ -65,11 +70,11 @@
 		return new Date(iso).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
 	}
 
-	function openApprove(event: ApprovalEvent) {
+	function openApprove(event: ManagedEvent) {
 		modalMode = 'approve';
 		modalEvent = event;
 	}
-	function openReject(event: ApprovalEvent) {
+	function openReject(event: ManagedEvent) {
 		modalMode = 'reject';
 		modalEvent = event;
 	}
@@ -84,10 +89,10 @@
 		feedback = null;
 		try {
 			if (modalMode === 'approve') {
-				await approveEvent(modalEvent.event_id);
+				await updateEventStatus(modalEvent.id, 'approved');
 				feedback = { type: 'success', message: `Event "${modalEvent.title}" berhasil disetujui.` };
 			} else if (modalMode === 'reject') {
-				await rejectEvent(modalEvent.event_id, reason ?? '');
+				await updateEventStatus(modalEvent.id, 'rejected', reason);
 				feedback = { type: 'success', message: `Event "${modalEvent.title}" ditolak.` };
 			}
 			await refreshList();
@@ -113,7 +118,7 @@
 	{#if feedback}
 		<div
 			class="text-xs rounded-lg px-3 py-2 border {feedback.type === 'success'
-				? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+				? 'bg-brand-50 text-brand-800 border-brand-200'
 				: 'bg-red-50 text-red-700 border-red-200'}"
 		>
 			{feedback.message}
@@ -140,7 +145,7 @@
 	<div class="flex flex-wrap gap-3">
 		<select
 			bind:value={organizerFilter}
-			class="text-xs border border-slate-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600"
+			class="text-xs border border-slate-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-brand-600"
 		>
 			<option value="all">Semua Organizer</option>
 			{#each organizers as organizer}
@@ -149,7 +154,7 @@
 		</select>
 		<select
 			bind:value={statusFilter}
-			class="text-xs border border-slate-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600"
+			class="text-xs border border-slate-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-brand-600"
 		>
 			<option value="all">Semua Status</option>
 			<option value="pending_approval">Menunggu</option>
@@ -178,11 +183,11 @@
 					</tr>
 				</thead>
 				<tbody class="divide-y divide-slate-100">
-					{#each filteredEvents as event (event.event_id)}
+					{#each filteredEvents as event (event.id)}
 						<tr class="hover:bg-slate-50">
 							<td class="px-4 py-3 font-semibold text-slate-900">{event.title}</td>
 							<td class="px-4 py-3 text-slate-600">{event.organizer_name}</td>
-							<td class="px-4 py-3 text-slate-600">{formatDate(event.submitted_at)}</td>
+							<td class="px-4 py-3 text-slate-600">{formatDate(event.created_at)}</td>
 							<td class="px-4 py-3">
 								<span class="border rounded-full px-2 py-0.5 text-[11px] font-semibold {statusClass[event.status]}">
 									{statusLabel[event.status]}
@@ -191,7 +196,7 @@
 							<td class="px-4 py-3">
 								<div class="flex items-center gap-2">
 									<button
-										onclick={() => goto(`/dashboard/super-admin/event-validation/${event.event_id}`)}
+										onclick={() => goto(`/dashboard/super-admin/event-validation/${event.id}`)}
 										title="Lihat detail"
 										class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600"
 									>
@@ -201,7 +206,7 @@
 										<button
 											onclick={() => openApprove(event)}
 											title="Approve"
-											class="p-1.5 rounded-lg hover:bg-emerald-50 text-emerald-700"
+											class="p-1.5 rounded-lg hover:bg-brand-50 text-brand-700"
 										>
 											<CheckCircle2 class="w-4 h-4" />
 										</button>
@@ -232,7 +237,7 @@
 	requireReason={modalMode === 'reject'}
 	reasonLabel="Alasan Penolakan (wajib)"
 	confirmLabel={modalMode === 'approve' ? 'Ya, Setujui' : 'Kirim Penolakan'}
-	confirmClass={modalMode === 'approve' ? 'bg-emerald-700 hover:bg-emerald-800' : 'bg-red-600 hover:bg-red-700'}
+	confirmClass={modalMode === 'approve' ? 'bg-brand-700 hover:bg-brand-800' : 'bg-red-600 hover:bg-red-700'}
 	{isSubmitting}
 	onConfirm={handleConfirm}
 	onCancel={closeModal}

@@ -12,7 +12,7 @@
 		<span class="text-xs text-slate-500 font-medium">{title}</span>
 		{#if IconComponent}
 			{@const Icon = IconComponent}
-			<div class="p-1.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200">
+			<div class="p-1.5 rounded-lg bg-brand-50 text-brand-700 border border-brand-200">
 				<Icon class="w-4 h-4" />
 			</div>
 		{/if}
