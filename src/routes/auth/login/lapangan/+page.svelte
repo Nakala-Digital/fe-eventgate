@@ -8,12 +8,43 @@
 	let password = $state('');
 	let remember = $state(false);
 	let showPassword = $state(false);
+	let emailError = $state('');
+	let passwordError = $state('');
 	let errorMessage = $state('');
 	let isSubmitting = $state(false);
+
+	function handleEmailInput(val: string) {
+		email = val;
+		if (emailError && val.trim()) {
+			emailError = '';
+		}
+	}
+
+	function handlePasswordInput(val: string) {
+		password = val;
+		if (passwordError && val) {
+			passwordError = '';
+		}
+	}
 
 	async function handleLogin(e: Event) {
 		e.preventDefault();
 		errorMessage = '';
+		emailError = '';
+		passwordError = '';
+
+		let isValid = true;
+		if (!email.trim()) {
+			emailError = 'Email tidak boleh kosong';
+			isValid = false;
+		}
+		if (!password) {
+			passwordError = 'Kata sandi tidak boleh kosong';
+			isValid = false;
+		}
+
+		if (!isValid) return;
+
 		isSubmitting = true;
 
 		try {
@@ -38,9 +69,13 @@
 		bind:password
 		bind:remember
 		bind:showPassword
+		{emailError}
+		{passwordError}
 		globalError={errorMessage}
 		{isSubmitting}
 		forgotPasswordHref="/auth/login/lapangan/lupa-kata-sandi"
 		onSubmit={handleLogin}
+		onEmailInput={handleEmailInput}
+		onPasswordInput={handlePasswordInput}
 	/>
 </div>
