@@ -112,9 +112,9 @@
 					aria-label={showPassword ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'}
 				>
 					{#if showPassword}
-						<EyeOff class="w-4 h-4" />
-					{:else}
 						<Eye class="w-4 h-4" />
+					{:else}
+						<EyeOff class="w-4 h-4" />
 					{/if}
 				</button>
 			</div>
@@ -129,7 +129,7 @@
 				<input
 					type="checkbox"
 					bind:checked={remember}
-					class="w-4 h-4 rounded border-slate-300 text-brand-700 focus:ring-brand-600 rounded-sm"
+					class="w-4 h-4 rounded border-slate-300 text-brand-700 accent-brand-700 focus:ring-brand-600 rounded-sm cursor-pointer"
 				/>
 				<span>Ingatkan Akun Saya</span>
 			</label>
