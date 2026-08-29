@@ -1,6 +1,6 @@
 <script lang="ts">
 	import logo from '$lib/assets/al-azhar-logo.png';
-	import { Mail, Lock, Eye, EyeOff, ArrowRight } from 'lucide-svelte';
+	import { Mail, Lock, Eye, EyeOff, ArrowRight, AlertCircle } from 'lucide-svelte';
 
 	interface Props {
 		email?: string;
@@ -60,8 +60,9 @@
 
 	<!-- Global Error Alert -->
 	{#if globalError}
-		<div class="text-xs text-red-700 bg-red-50 border border-red-200 rounded-xl px-3.5 py-2.5">
-			{globalError}
+		<div class="text-xs text-red-700 bg-red-50 border border-red-200 rounded-xl px-3.5 py-2.5 flex items-center gap-2 shadow-sm">
+			<AlertCircle class="w-4 h-4 shrink-0 text-red-600" />
+			<span>{globalError}</span>
 		</div>
 	{/if}
 

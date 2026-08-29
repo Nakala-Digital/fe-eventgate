@@ -49,7 +49,7 @@
 	function goBack() {
 		if (step === 'otp') step = 'email';
 		else if (step === 'password') step = 'otp';
-		else goto('/auth/login/lapangan');
+		else goto('/auth/login/user');
 	}
 </script>
 
@@ -223,7 +223,7 @@
 					Kata sandi Anda telah berhasil diubah. Silakan masuk kembali menggunakan kata sandi baru Anda.
 				</p>
 				<a
-					href="/auth/login/lapangan"
+					href="/auth/login/user"
 					class="w-full text-sm font-bold bg-brand-700 hover:bg-brand-800 text-white py-3 px-4 rounded-xl transition-all shadow-sm hover:shadow flex items-center justify-center gap-2 mt-4"
 				>
 					<span>Kembali Login</span>
