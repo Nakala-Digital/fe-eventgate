@@ -78,7 +78,9 @@
 					bind:value={email}
 					oninput={(e) => onEmailInput && onEmailInput((e.target as HTMLInputElement).value)}
 					placeholder="Masukkan email Anda"
-					class="w-full bg-white border {emailError ? 'border-red-500' : 'border-slate-200'} text-xs rounded-xl pl-10 pr-3.5 py-3 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-transparent shadow-sm transition-all"
+					autocomplete="email"
+					inputmode="email"
+					class="w-full bg-white border {emailError ? 'border-red-500' : 'border-slate-200'} text-xs rounded-xl pl-10 pr-3.5 py-3 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-brand-600 shadow-sm transition-all"
 				/>
 			</div>
 			{#if emailError}
@@ -100,7 +102,8 @@
 					bind:value={password}
 					oninput={(e) => onPasswordInput && onPasswordInput((e.target as HTMLInputElement).value)}
 					placeholder="Masukkan kata sandi Anda"
-					class="w-full bg-white border {passwordError ? 'border-red-500' : 'border-slate-200'} text-xs rounded-xl pl-10 pr-10 py-3 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-transparent shadow-sm transition-all"
+					autocomplete="current-password"
+					class="w-full bg-white border {passwordError ? 'border-red-500' : 'border-slate-200'} text-xs rounded-xl pl-10 pr-10 py-3 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-brand-600 shadow-sm transition-all"
 				/>
 				<button
 					type="button"
