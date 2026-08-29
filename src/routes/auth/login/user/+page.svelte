@@ -79,7 +79,7 @@
 			<div class="space-y-1.5">
 				<div class="flex justify-between items-center">
 					<label for="password" class="text-[11px] font-bold text-slate-700 uppercase tracking-wider">KATA SANDI</label>
-					<a href="/auth/login/lapangan/lupa-kata-sandi" class="text-[11px] font-medium text-brand-700 hover:underline">Lupa Password?</a>
+					<a href="/auth/login/user/lupa-kata-sandi" class="text-[11px] font-medium text-brand-700 hover:underline">Lupa Password?</a>
 				</div>
 				<div class="relative">
 					<Lock class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
