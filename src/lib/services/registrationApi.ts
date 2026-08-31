@@ -25,59 +25,34 @@ export interface RegistrationFormData {
 	answers: RegistrationAnswer[];
 }
 
-// ponytail: in-memory mock until backend Participant Registration API (EVG-49) is ready —
-// swap the fetch body below for a real call once the endpoint exists.
-let mockRegistrations: Registration[] = [];
-let nextId = 1;
-
-function delay<T>(value: T, ms = 300): Promise<T> {
-	return new Promise((resolve) => setTimeout(() => resolve(value), ms));
-}
-
 function unwrap(json: unknown): unknown {
 	return json && typeof json === 'object' && 'data' in (json as Record<string, unknown>)
 		? (json as Record<string, unknown>).data
 		: json;
 }
 
-function generateCode(): string {
-	const random = Math.random().toString(36).slice(2, 8).toUpperCase();
-	return `EVG-${random}`;
-}
-
 /**
- * Submit a registration for an event. `isPaidEvent` determines the initial status:
- * gratis -> confirmed immediately, berbayar -> pending_payment (menunggu pembayaran).
+ * Submit a registration for an event (EVG-49 / EVG-50).
+ * Connects directly to backend POST /api/v1/events/{id}/registrations.
  */
 export async function submitRegistration(
 	eventId: number,
 	data: RegistrationFormData,
-	isPaidEvent: boolean
+	_isPaidEvent?: boolean
 ): Promise<Registration> {
-	try {
-		const res = await fetch(`${ENV.API_BASE_URL}/events/${eventId}/registrations`, {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify(data)
-		});
-		if (res.ok) {
-			const payload = unwrap(await res.json());
-			if (payload && typeof payload === 'object') return payload as Registration;
-		}
-	} catch {
-		// Fallback to mock
+	const res = await fetch(`${ENV.API_BASE_URL}/events/${eventId}/registrations`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify(data)
+	});
+
+	if (res.ok) {
+		const payload = unwrap(await res.json());
+		if (payload && typeof payload === 'object') return payload as Registration;
+		throw new Error('Format respons pendaftaran tidak valid.');
 	}
 
-	const registration: Registration = {
-		id: nextId++,
-		registration_code: generateCode(),
-		event_id: eventId,
-		participant_name: data.participant_name,
-		participant_email: data.participant_email,
-		answers: data.answers,
-		status: isPaidEvent ? 'pending_payment' : 'confirmed',
-		created_at: new Date().toISOString()
-	};
-	mockRegistrations = [...mockRegistrations, registration];
-	return delay(registration);
+	const body = await res.json().catch(() => ({ message: '' }));
+	const errMsg = body.message || body.error || 'Gagal mengirim pendaftaran.';
+	throw new Error(errMsg);
 }

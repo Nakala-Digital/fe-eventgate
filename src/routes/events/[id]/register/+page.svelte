@@ -82,8 +82,8 @@
 				{ participant_name: participantName.trim(), participant_email: participantEmail.trim(), answers },
 				event.ticket_type === 'berbayar'
 			);
-		} catch {
-			submitError = 'Gagal mengirim pendaftaran, coba lagi.';
+		} catch (err) {
+			submitError = err instanceof Error ? err.message : 'Gagal mengirim pendaftaran, coba lagi.';
 		} finally {
 			isSubmitting = false;
 		}
