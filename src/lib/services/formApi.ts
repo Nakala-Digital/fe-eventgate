@@ -105,7 +105,7 @@ function mapBackendQuestion(raw: Record<string, any>): DynamicQuestion {
 		id: raw.id,
 		event_id: raw.event_id,
 		label: raw.question_text,
-		type: raw.question_type === 'dropdown' ? 'select' : raw.question_type,
+		type: raw.question_type,
 		// `kondisional` (conditional questions) is out of EVG-48 scope — real questions
 		// saved as kondisional by another client still render here, treated as opsional.
 		requirement: raw.requirement_type === 'wajib' ? 'wajib' : 'opsional',
@@ -118,7 +118,7 @@ function toBackendQuestionPayload(data: QuestionFormData, displayOrder?: number)
 	const needsOptions = data.type === 'select' || data.type === 'radio' || data.type === 'checkbox';
 	return {
 		question_text: data.label,
-		question_type: data.type === 'select' ? 'dropdown' : data.type,
+		question_type: data.type,
 		requirement_type: data.requirement,
 		...(displayOrder !== undefined ? { display_order: displayOrder } : {}),
 		options: needsOptions ? data.options.map((label, i) => ({ option_label: label, option_value: label, display_order: i + 1 })) : []
@@ -166,9 +166,16 @@ export async function createQuestion(eventId: number, data: QuestionFormData): P
 		if (res.ok) {
 			const payload = unwrap(await res.json());
 			if (payload && typeof payload === 'object') return mapBackendQuestion(payload as Record<string, any>);
+		} else {
+			const errBody = await res.json().catch(() => ({ message: '' }));
+			const errMsg = errBody.message || errBody.error || `Gagal membuat pertanyaan (HTTP ${res.status}).`;
+			throw new Error(errMsg);
 		}
-	} catch {
-		// Fallback to mock
+	} catch (err: any) {
+		if (err?.message && !err.message.includes('Failed to fetch') && !err.message.includes('NetworkError')) {
+			throw err;
+		}
+		// Fallback to mock only if backend is unreachable
 	}
 
 	const order = mockQuestions.filter((q) => q.event_id === eventId).length + 1;
@@ -192,9 +199,16 @@ export async function updateQuestion(
 		if (res.ok) {
 			const payload = unwrap(await res.json());
 			if (payload && typeof payload === 'object') return mapBackendQuestion(payload as Record<string, any>);
+		} else {
+			const errBody = await res.json().catch(() => ({ message: '' }));
+			const errMsg = errBody.message || errBody.error || `Gagal memperbarui pertanyaan (HTTP ${res.status}).`;
+			throw new Error(errMsg);
 		}
-	} catch {
-		// Fallback to mock
+	} catch (err: any) {
+		if (err?.message && !err.message.includes('Failed to fetch') && !err.message.includes('NetworkError')) {
+			throw err;
+		}
+		// Fallback to mock only if backend is unreachable
 	}
 
 	const index = mockQuestions.findIndex((q) => q.id === questionId);
@@ -211,7 +225,15 @@ export async function deleteQuestion(eventId: number, questionId: number): Promi
 			headers: { ...getAuthHeader() }
 		});
 		if (res.ok) return true;
-	} catch {
+		if (res.status >= 400) {
+			const errBody = await res.json().catch(() => ({ message: '' }));
+			const errMsg = errBody.message || errBody.error || `Gagal menghapus pertanyaan (HTTP ${res.status}).`;
+			throw new Error(errMsg);
+		}
+	} catch (err: any) {
+		if (err?.message && !err.message.includes('Failed to fetch') && !err.message.includes('NetworkError')) {
+			throw err;
+		}
 		// Fallback to mock
 	}
 

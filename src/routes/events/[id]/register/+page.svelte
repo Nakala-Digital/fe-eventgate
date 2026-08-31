@@ -3,13 +3,21 @@
 	import { page } from '$app/state';
 	import { getEventById, type ManagedEvent } from '$lib/services/eventApi';
 	import { listQuestions, type DynamicQuestion } from '$lib/services/formApi';
-	import { submitRegistration, type Registration, type RegistrationAnswer } from '$lib/services/registrationApi';
+	import {
+		submitRegistration,
+		getTicketTypes,
+		type Registration,
+		type RegistrationAnswer,
+		type TicketType
+	} from '$lib/services/registrationApi';
 	import { ArrowLeft, Loader2, CheckCircle2, Clock } from 'lucide-svelte';
 
 	const eventId = $derived(Number(page.params.id));
 
 	let event = $state<ManagedEvent | null>(null);
 	let questions = $state<DynamicQuestion[]>([]);
+	let ticketTypes = $state<TicketType[]>([]);
+	let selectedTicketTypeId = $state<number | null>(null);
 	let isLoading = $state(true);
 	let notFound = $state(false);
 
@@ -33,7 +41,16 @@
 				notFound = true;
 			} else {
 				event = data;
-				questions = await listQuestions(eventId);
+				const [fetchedQuestions, fetchedTicketTypes] = await Promise.all([
+					listQuestions(eventId),
+					getTicketTypes(eventId)
+				]);
+				questions = fetchedQuestions;
+				ticketTypes = fetchedTicketTypes;
+				if (ticketTypes.length > 0) {
+					selectedTicketTypeId = ticketTypes[0].id;
+				}
+
 				for (const q of questions) {
 					if (q.type === 'checkbox') checkboxValues[q.id] = [];
 				}
@@ -49,6 +66,13 @@
 		const newErrors: Record<string, string> = {};
 		if (!participantName.trim()) newErrors.participantName = 'Nama wajib diisi.';
 		if (!participantEmail.trim()) newErrors.participantEmail = 'Email wajib diisi.';
+
+		if (!selectedTicketTypeId && ticketTypes.length > 0) {
+			selectedTicketTypeId = ticketTypes[0].id;
+		}
+		if (!selectedTicketTypeId) {
+			newErrors.ticketTypeId = 'Tipe tiket wajib dipilih.';
+		}
 
 		for (const q of questions) {
 			if (q.requirement !== 'wajib') continue;
@@ -79,7 +103,12 @@
 
 			result = await submitRegistration(
 				event.id,
-				{ participant_name: participantName.trim(), participant_email: participantEmail.trim(), answers },
+				{
+					ticket_type_id: selectedTicketTypeId || 1,
+					participant_name: participantName.trim(),
+					participant_email: participantEmail.trim(),
+					answers
+				},
 				event.ticket_type === 'berbayar'
 			);
 		} catch (err) {
@@ -104,7 +133,7 @@
 
 	{#if isLoading}
 		<div class="bg-white border border-slate-200 rounded-xl p-12 text-center shadow-sm">
-			<Loader2 class="w-8 h-8 text-brand-600 animate-spin mx-auto mb-3" />
+			<Loader2 class="w-8 h-8 text-emerald-600 animate-spin mx-auto mb-3" />
 			<p class="text-xs font-semibold text-slate-700">Memuat formulir pendaftaran...</p>
 		</div>
 	{:else if notFound || !event}
@@ -115,7 +144,7 @@
 		<!-- Success / status state -->
 		<div class="bg-white border border-slate-200 rounded-xl p-8 text-center shadow-sm space-y-3">
 			{#if result.status === 'confirmed'}
-				<CheckCircle2 class="w-14 h-14 text-brand-600 mx-auto" />
+				<CheckCircle2 class="w-14 h-14 text-emerald-600 mx-auto" />
 				<h2 class="text-lg font-bold text-slate-900">Pendaftaran Berhasil!</h2>
 				<p class="text-xs text-slate-500">Kamu terdaftar untuk "{event.title}". Sampai jumpa di acaranya!</p>
 			{:else}
@@ -141,6 +170,24 @@
 				<p class="text-[11px] text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{submitError}</p>
 			{/if}
 
+			{#if ticketTypes.length > 1}
+				<div class="space-y-1.5">
+					<label for="ticket-type-select" class="block text-xs font-medium text-slate-700">
+						Pilih Tipe Tiket <span class="text-red-500">*</span>
+					</label>
+					<select
+						id="ticket-type-select"
+						bind:value={selectedTicketTypeId}
+						class="w-full text-xs border rounded-lg px-3 py-2 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 {errors.ticketTypeId ? 'border-red-500' : 'border-slate-300'}"
+					>
+						{#each ticketTypes as tt}
+							<option value={tt.id}>{tt.name} - {tt.price === 0 ? 'Gratis' : `Rp ${tt.price.toLocaleString('id-ID')}`}</option>
+						{/each}
+					</select>
+					{#if errors.ticketTypeId}<p class="text-[11px] text-red-500">{errors.ticketTypeId}</p>{/if}
+				</div>
+			{/if}
+
 			<div class="space-y-1.5">
 				<label for="participant-name" class="block text-xs font-medium text-slate-700">
 					Nama Lengkap <span class="text-red-500">*</span>
@@ -149,7 +196,7 @@
 					id="participant-name"
 					type="text"
 					bind:value={participantName}
-					class="w-full text-xs border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-600 {errors.participantName ? 'border-red-500' : 'border-slate-300'}"
+					class="w-full text-xs border rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 {errors.participantName ? 'border-red-500' : 'border-slate-300'}"
 				/>
 				{#if errors.participantName}<p class="text-[11px] text-red-500">{errors.participantName}</p>{/if}
 			</div>
@@ -162,7 +209,7 @@
 					id="participant-email"
 					type="email"
 					bind:value={participantEmail}
-					class="w-full text-xs border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-600 {errors.participantEmail ? 'border-red-500' : 'border-slate-300'}"
+					class="w-full text-xs border rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 {errors.participantEmail ? 'border-red-500' : 'border-slate-300'}"
 				/>
 				{#if errors.participantEmail}<p class="text-[11px] text-red-500">{errors.participantEmail}</p>{/if}
 			</div>
@@ -179,13 +226,13 @@
 							id={`q-${q.id}`}
 							bind:value={answerValues[q.id]}
 							rows="3"
-							class="w-full text-xs border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-600 {errors[`q_${q.id}`] ? 'border-red-500' : 'border-slate-300'}"
+							class="w-full text-xs border rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 {errors[`q_${q.id}`] ? 'border-red-500' : 'border-slate-300'}"
 						></textarea>
 					{:else if q.type === 'select'}
 						<select
 							id={`q-${q.id}`}
 							bind:value={answerValues[q.id]}
-							class="w-full text-xs border rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-brand-600 {errors[`q_${q.id}`] ? 'border-red-500' : 'border-slate-300'}"
+							class="w-full text-xs border rounded-lg px-3 py-2 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 {errors[`q_${q.id}`] ? 'border-red-500' : 'border-slate-300'}"
 						>
 							<option value="">Pilih {q.label}</option>
 							{#each q.options as opt}
@@ -217,7 +264,7 @@
 							id={`q-${q.id}`}
 							type={q.type === 'number' ? 'number' : q.type === 'date' ? 'date' : 'text'}
 							bind:value={answerValues[q.id]}
-							class="w-full text-xs border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-600 {errors[`q_${q.id}`] ? 'border-red-500' : 'border-slate-300'}"
+							class="w-full text-xs border rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 {errors[`q_${q.id}`] ? 'border-red-500' : 'border-slate-300'}"
 						/>
 					{/if}
 					{#if errors[`q_${q.id}`]}<p class="text-[11px] text-red-500">{errors[`q_${q.id}`]}</p>{/if}
@@ -233,7 +280,7 @@
 			<button
 				type="submit"
 				disabled={isSubmitting}
-				class="w-full text-xs font-bold text-white bg-brand-700 hover:bg-brand-800 disabled:opacity-60 px-4 py-2.5 rounded-lg shadow-sm"
+				class="w-full text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 px-4 py-2.5 rounded-lg shadow-sm transition"
 			>
 				{isSubmitting ? 'Mengirim...' : 'Kirim Pendaftaran'}
 			</button>
