@@ -256,6 +256,45 @@ export async function getEventById(id: number): Promise<ManagedEvent> {
 	return delay({ ...found });
 }
 
+function formatToIso(dateStr?: string): string {
+	if (!dateStr) return '';
+	try {
+		const d = new Date(dateStr);
+		if (!isNaN(d.getTime())) return d.toISOString();
+	} catch {
+		// Keep original
+	}
+	return dateStr;
+}
+
+function formatEventPayload(data: EventFormData) {
+	const startTimeIso = formatToIso(data.start_date);
+	const endTimeIso = formatToIso(data.end_date);
+	const banner =
+		data.banner_url && data.banner_url.trim()
+			? data.banner_url.trim()
+			: 'https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=600&q=80';
+
+	return {
+		title: data.title?.trim() ?? '',
+		name: data.title?.trim() ?? '',
+		description: data.description?.trim() ?? '',
+		banner: banner,
+		banner_url: banner,
+		location: data.location?.trim() ?? '',
+		start_time: startTimeIso,
+		start_date: startTimeIso,
+		end_time: endTimeIso,
+		end_date: endTimeIso,
+		is_paid: data.ticket_type === 'berbayar',
+		ticket_type: data.ticket_type,
+		price: data.ticket_type === 'gratis' ? 0 : Number(data.price || 0),
+		quota: Number(data.quota || 0),
+		category: data.category,
+		organizer_name: data.organizer_name?.trim() ?? ''
+	};
+}
+
 /**
  * Create a new event
  */
@@ -264,11 +303,13 @@ export async function createEvent(data: EventFormData): Promise<ManagedEvent> {
 	const newEvent: ManagedEvent = {
 		id: mockEvents.length > 0 ? Math.max(...mockEvents.map((e) => e.id)) + 1 : 1,
 		...data,
-		price: data.ticket_type === 'gratis' ? 0 : data.price,
+		price: data.ticket_type === 'gratis' ? 0 : Number(data.price || 0),
 		status: 'draft',
 		created_at: now,
 		updated_at: now
 	};
+
+	const payload = formatEventPayload(data);
 
 	try {
 		const res = await fetch(`${ENV.API_BASE_URL}/events`, {
@@ -277,14 +318,22 @@ export async function createEvent(data: EventFormData): Promise<ManagedEvent> {
 				'Content-Type': 'application/json',
 				...getAuthHeader()
 			},
-			body: JSON.stringify(newEvent)
+			body: JSON.stringify(payload)
 		});
 		if (res.ok) {
-			const payload = unwrap(await res.json());
-			if (payload && typeof payload === 'object') return mapBackendEvent(payload as Record<string, any>);
+			const resJson = await res.json();
+			const payloadData = unwrap(resJson);
+			if (payloadData && typeof payloadData === 'object') return mapBackendEvent(payloadData as Record<string, any>);
+		} else {
+			const errBody = await res.json().catch(() => ({ message: '' }));
+			const errMsg = errBody.message || errBody.error || `Gagal membuat event (HTTP ${res.status}).`;
+			throw new Error(errMsg);
 		}
-	} catch {
-		// Fallback to mock update
+	} catch (err: any) {
+		if (err?.message && !err.message.includes('Failed to fetch') && !err.message.includes('NetworkError')) {
+			throw err;
+		}
+		// Fallback to mock update if backend is completely unreachable
 	}
 
 	mockEvents = [newEvent, ...mockEvents];
@@ -296,6 +345,7 @@ export async function createEvent(data: EventFormData): Promise<ManagedEvent> {
  */
 export async function updateEvent(id: number, data: EventFormData): Promise<ManagedEvent> {
 	const now = new Date().toISOString();
+	const payload = formatEventPayload(data);
 
 	try {
 		const res = await fetch(`${ENV.API_BASE_URL}/events/${id}`, {
@@ -304,14 +354,22 @@ export async function updateEvent(id: number, data: EventFormData): Promise<Mana
 				'Content-Type': 'application/json',
 				...getAuthHeader()
 			},
-			body: JSON.stringify(data)
+			body: JSON.stringify(payload)
 		});
 		if (res.ok) {
-			const payload = unwrap(await res.json());
-			if (payload && typeof payload === 'object') return mapBackendEvent(payload as Record<string, any>);
+			const resJson = await res.json();
+			const payloadData = unwrap(resJson);
+			if (payloadData && typeof payloadData === 'object') return mapBackendEvent(payloadData as Record<string, any>);
+		} else {
+			const errBody = await res.json().catch(() => ({ message: '' }));
+			const errMsg = errBody.message || errBody.error || `Gagal memperbarui event (HTTP ${res.status}).`;
+			throw new Error(errMsg);
 		}
-	} catch {
-		// Fallback to mock
+	} catch (err: any) {
+		if (err?.message && !err.message.includes('Failed to fetch') && !err.message.includes('NetworkError')) {
+			throw err;
+		}
+		// Fallback to mock if backend is completely unreachable
 	}
 
 	const index = mockEvents.findIndex((e) => e.id === Number(id));
@@ -320,7 +378,7 @@ export async function updateEvent(id: number, data: EventFormData): Promise<Mana
 	const updated: ManagedEvent = {
 		...mockEvents[index],
 		...data,
-		price: data.ticket_type === 'gratis' ? 0 : data.price,
+		price: data.ticket_type === 'gratis' ? 0 : Number(data.price || 0),
 		updated_at: now
 	};
 	mockEvents[index] = updated;
@@ -337,7 +395,15 @@ export async function deleteEvent(id: number): Promise<boolean> {
 			headers: { ...getAuthHeader() }
 		});
 		if (res.ok) return true;
-	} catch {
+		if (res.status >= 400) {
+			const errBody = await res.json().catch(() => ({ message: '' }));
+			const errMsg = errBody.message || errBody.error || `Gagal menghapus event (HTTP ${res.status}).`;
+			throw new Error(errMsg);
+		}
+	} catch (err: any) {
+		if (err?.message && !err.message.includes('Failed to fetch') && !err.message.includes('NetworkError')) {
+			throw err;
+		}
 		// Fallback to mock
 	}
 
@@ -371,7 +437,7 @@ export async function updateEventStatus(id: number, status: EventStatus, reason?
 					'Content-Type': 'application/json',
 					...getAuthHeader()
 				},
-				body: JSON.stringify({ notes: reason ?? '' })
+				body: JSON.stringify({ notes: reason ?? '', reason: reason ?? '' })
 			});
 			if (res.ok) {
 				const payload = unwrap(await res.json());
@@ -380,9 +446,16 @@ export async function updateEventStatus(id: number, status: EventStatus, reason?
 					if (reason) mapped.reject_reason = reason;
 					return mapped;
 				}
+			} else {
+				const errBody = await res.json().catch(() => ({ message: '' }));
+				const errMsg = errBody.message || errBody.error || `Aksi status gagal diproses (HTTP ${res.status}).`;
+				throw new Error(errMsg);
 			}
-		} catch {
-			// Fallback to mock
+		} catch (err: any) {
+			if (err?.message && !err.message.includes('Failed to fetch') && !err.message.includes('NetworkError')) {
+				throw err;
+			}
+			// Fallback to mock if offline
 		}
 	}
 

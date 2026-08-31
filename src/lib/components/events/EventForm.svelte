@@ -33,14 +33,31 @@
 	let price = $state<number>(0);
 	let quota = $state<number>(100);
 
+	function toDatetimeLocal(isoStr?: string): string {
+		if (!isoStr) return '';
+		try {
+			const d = new Date(isoStr);
+			if (isNaN(d.getTime())) return isoStr;
+			const pad = (n: number) => n.toString().padStart(2, '0');
+			const year = d.getFullYear();
+			const month = pad(d.getMonth() + 1);
+			const day = pad(d.getDate());
+			const hours = pad(d.getHours());
+			const minutes = pad(d.getMinutes());
+			return `${year}-${month}-${day}T${hours}:${minutes}`;
+		} catch {
+			return isoStr;
+		}
+	}
+
 	$effect(() => {
 		if (initialData) {
 			title = initialData.title ?? '';
 			category = initialData.category ?? 'Akademik';
 			organizer_name = initialData.organizer_name ?? '';
 			description = initialData.description ?? '';
-			start_date = initialData.start_date ?? '';
-			end_date = initialData.end_date ?? '';
+			start_date = toDatetimeLocal(initialData.start_date);
+			end_date = toDatetimeLocal(initialData.end_date);
 			location = initialData.location ?? '';
 			banner_url = initialData.banner_url ?? '';
 			ticket_type = initialData.ticket_type ?? 'gratis';
@@ -117,7 +134,7 @@
 	}
 </script>
 
-<form onsubmit={handleSubmit} class="space-y-6 max-w-4xl bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+<form onsubmit={handleSubmit} novalidate class="space-y-6 max-w-4xl bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
 	<div class="flex items-center justify-between border-b border-slate-200 pb-4">
 		<div>
 			<h2 class="text-lg font-bold text-slate-900">
@@ -344,8 +361,8 @@
 					<input
 						id="event-price"
 						type="number"
-						min="1"
-						step="1000"
+						min="0"
+						step="any"
 						bind:value={price}
 						placeholder="50000"
 						class="w-full text-xs border rounded-lg pl-9 pr-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 {errors.price ? 'border-red-500' : 'border-slate-300'}"
