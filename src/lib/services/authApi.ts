@@ -38,6 +38,12 @@ const BACKEND_ERROR_MAP: Record<string, string> = {
 	'invalid request body': 'Terjadi kesalahan, coba lagi.'
 };
 
+function unwrap(json: unknown): unknown {
+	return json && typeof json === 'object' && 'data' in (json as Record<string, unknown>)
+		? (json as Record<string, unknown>).data
+		: json;
+}
+
 export async function login(email: string, password: string): Promise<{ token: string; user: UserProfile }> {
 	try {
 		const res = await fetch(`${ENV.API_BASE_URL}/auth/login`, {
@@ -47,13 +53,14 @@ export async function login(email: string, password: string): Promise<{ token: s
 		});
 
 		if (res.ok) {
-			const data: { token: string; user: BackendUser } = await res.json();
-			return { token: data.token, user: toUserProfile(data.user) };
+			const payload = unwrap(await res.json()) as { token: string; user: BackendUser };
+			return { token: payload.token, user: toUserProfile(payload.user) };
 		}
 
 		if (res.status === 401 || res.status === 403 || res.status === 400) {
-			const body = await res.json().catch(() => ({ error: '' }));
-			throw new LoginError(BACKEND_ERROR_MAP[body.error] ?? 'Email atau kata sandi salah.');
+			const body = await res.json().catch(() => ({ error: '', message: '' }));
+			const errMsg = body.message || body.error || '';
+			throw new LoginError(BACKEND_ERROR_MAP[errMsg] ?? 'Email atau kata sandi salah.');
 		}
 	} catch (err) {
 		if (err instanceof LoginError) throw err;
