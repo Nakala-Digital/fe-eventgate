@@ -22,7 +22,7 @@
 
 	// Form fields reactive state
 	let title = $state('');
-	let category = $state('Akademik');
+	let category = $state('');
 	let organizer_name = $state('');
 	let description = $state('');
 	let start_date = $state('');
@@ -53,7 +53,7 @@
 	$effect(() => {
 		if (initialData) {
 			title = initialData.title ?? '';
-			category = initialData.category ?? 'Akademik';
+			category = initialData.category ?? '';
 			organizer_name = initialData.organizer_name ?? '';
 			description = initialData.description ?? '';
 			start_date = toDatetimeLocal(initialData.start_date);
@@ -194,6 +194,7 @@
 					bind:value={category}
 					class="w-full text-xs border rounded-lg px-3 py-2 text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600 {errors.category ? 'border-red-500' : 'border-slate-300'}"
 				>
+					<option value="" disabled selected={!category}>-- Pilih Kategori Event --</option>
 					{#each categories as cat}
 						<option value={cat}>{cat}</option>
 					{/each}

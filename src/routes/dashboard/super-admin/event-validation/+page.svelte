@@ -14,7 +14,8 @@
 		X,
 		ChevronLeft,
 		ChevronRight,
-		Loader2
+		Loader2,
+		Edit3
 	} from 'lucide-svelte';
 
 	// Halaman validasi menampilkan event dalam siklus persetujuan (default: pending, approved, rejected, revision)
@@ -86,9 +87,30 @@
 
 	const totalPages = $derived(Math.ceil(filteredEvents.length / pageSize) || 1);
 
+	const statusBadgeLabel: Record<string, string> = {
+		draft: 'Draft',
+		pending_approval: 'Menunggu',
+		approved: 'Disetujui',
+		revision_requested: 'Perlu Revisi',
+		rejected: 'Ditolak',
+		published: 'Dipublikasikan',
+		ended: 'Selesai'
+	};
+
+	const statusBadgeClass: Record<string, string> = {
+		draft: 'bg-slate-100 text-slate-700 border-slate-200',
+		pending_approval: 'bg-amber-50 text-amber-700 border-amber-200',
+		approved: 'bg-emerald-50 text-[#0B7A4B] border-emerald-200',
+		revision_requested: 'bg-orange-50 text-orange-700 border-orange-200',
+		rejected: 'bg-red-50 text-red-700 border-red-200',
+		published: 'bg-blue-50 text-blue-700 border-blue-200',
+		ended: 'bg-gray-100 text-gray-600 border-gray-300'
+	};
+
 	const counts = $derived({
 		pending: events.filter((e) => e.status === 'pending_approval').length,
 		approved: events.filter((e) => e.status === 'approved').length,
+		revision: events.filter((e) => e.status === 'revision_requested').length,
 		rejected: events.filter((e) => e.status === 'rejected').length
 	});
 
@@ -111,7 +133,7 @@
 
 	function openReviewModal(event: ManagedEvent) {
 		reviewModalEvent = event;
-		reviewReason = event.description || '';
+		reviewReason = '';
 		validationError = '';
 	}
 
@@ -184,8 +206,8 @@
 		</div>
 	{/if}
 
-	<!-- Stat Cards (Dipertahankan sesuai instruksi QA) -->
-	<div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+	<!-- Stat Cards (4 Status Approval) -->
+	<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
 		<div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm flex items-center justify-between">
 			<div>
 				<p class="text-xs text-slate-500 font-medium">Total Menunggu Approval</p>
@@ -202,6 +224,15 @@
 			</div>
 			<div class="w-10 h-10 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-center text-[#0B7A4B]">
 				<CheckCircle2 class="w-5 h-5" />
+			</div>
+		</div>
+		<div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm flex items-center justify-between">
+			<div>
+				<p class="text-xs text-slate-500 font-medium">Total Perlu Revisi</p>
+				<p class="text-2xl font-bold text-orange-600 mt-1">{counts.revision}</p>
+			</div>
+			<div class="w-10 h-10 rounded-lg bg-orange-50 border border-orange-200 flex items-center justify-center text-orange-600">
+				<Edit3 class="w-5 h-5" />
 			</div>
 		</div>
 		<div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm flex items-center justify-between">
@@ -284,6 +315,7 @@
 							<th class="text-left px-5 py-3.5 font-bold">Penyelenggara</th>
 							<th class="text-center px-5 py-3.5 font-bold">Kategori</th>
 							<th class="text-left px-5 py-3.5 font-bold">Tanggal, Waktu Acara</th>
+							<th class="text-center px-5 py-3.5 font-bold">Status</th>
 							<th class="text-center px-5 py-3.5 font-bold">Aksi</th>
 						</tr>
 					</thead>
@@ -330,6 +362,17 @@
 									<div class="text-[11px] text-slate-500 mt-0.5">
 										{formatTimeRange(event.start_date, event.end_date)}
 									</div>
+								</td>
+
+								<!-- Status -->
+								<td class="px-5 py-3.5 text-center">
+									<span
+										class="inline-block border rounded-full px-2.5 py-1 text-xs font-semibold {statusBadgeClass[
+											event.status
+										] ?? 'bg-slate-100 text-slate-700 border-slate-200'}"
+									>
+										• {statusBadgeLabel[event.status] ?? event.status}
+									</span>
 								</td>
 
 								<!-- Aksi: Button "Review" Berbingkai Hijau Sesuai Figma -->
@@ -420,8 +463,17 @@
 						EG
 					</div>
 				{/if}
-				<div class="space-y-0.5 min-w-0">
-					<h4 class="font-bold text-slate-900 text-sm line-clamp-1">{reviewModalEvent.title}</h4>
+				<div class="space-y-0.5 min-w-0 flex-1">
+					<div class="flex items-center gap-2 flex-wrap">
+						<h4 class="font-bold text-slate-900 text-sm line-clamp-1">{reviewModalEvent.title}</h4>
+						<span
+							class="border rounded-full px-2 py-0.5 text-[10px] font-semibold {statusBadgeClass[
+								reviewModalEvent.status
+							] ?? 'bg-slate-100 text-slate-700 border-slate-200'}"
+						>
+							{statusBadgeLabel[reviewModalEvent.status] ?? reviewModalEvent.status}
+						</span>
+					</div>
 					<p class="text-xs text-slate-500 font-medium">
 						Penyelenggara: <span class="text-slate-700 font-semibold">{reviewModalEvent.organizer_name}</span>
 					</p>
@@ -434,15 +486,25 @@
 				</div>
 			</div>
 
+			<!-- Deskripsi Event (Read-only preview) -->
+			{#if reviewModalEvent.description}
+				<div class="bg-slate-50 border border-slate-200/80 rounded-xl p-3 text-xs space-y-1">
+					<p class="font-semibold text-slate-700 text-[11px]">Deskripsi Event:</p>
+					<p class="text-slate-600 text-xs leading-relaxed max-h-20 overflow-y-auto whitespace-pre-line">
+						{reviewModalEvent.description}
+					</p>
+				</div>
+			{/if}
+
 			<!-- Card "Masukkan Alasan" Sesuai Frame Figma -->
 			<div class="bg-white border border-slate-200 rounded-xl p-4 space-y-2">
 				<label for="review-reason" class="block text-xs font-bold text-slate-900">
-					Masukkan Alasan
+					Masukkan Alasan <span class="text-slate-400 font-normal">(wajib untuk Revisi / Reject)</span>
 				</label>
 				<textarea
 					id="review-reason"
 					bind:value={reviewReason}
-					rows="4"
+					rows="3"
 					placeholder="Tuliskan catatan review, alasan revisi, atau alasan penolakan event..."
 					class="w-full text-xs text-slate-700 placeholder-slate-400 focus:outline-none resize-none leading-relaxed"
 				></textarea>

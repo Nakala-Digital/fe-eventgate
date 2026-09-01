@@ -6,6 +6,7 @@
 		listEvents,
 		deleteEvent,
 		updateEventStatus,
+		getApprovalLogs,
 		type ManagedEvent,
 		type EventStatus
 	} from '$lib/services/eventApi';
@@ -59,6 +60,25 @@
 		errorMsg = '';
 		try {
 			events = await listEvents();
+			// Fetch logs for rejected or revision requested events to show feedback notes
+			const needsLog = events.filter(
+				(e) => (e.status === 'rejected' || e.status === 'revision_requested') && !e.reject_reason
+			);
+			if (needsLog.length > 0) {
+				await Promise.all(
+					needsLog.map(async (ev) => {
+						try {
+							const logs = await getApprovalLogs(ev.id);
+							const lastLog = [...logs]
+								.reverse()
+								.find((l) => l.action === 'rejected' || l.action === 'revision_requested');
+							if (lastLog?.notes) ev.reject_reason = lastLog.notes;
+						} catch {
+							// Ignore log error
+						}
+					})
+				);
+			}
 		} catch (err: any) {
 			hasError = true;
 			errorMsg = err?.message || 'Gagal memuat daftar event. Silakan periksa koneksi internet Anda.';
@@ -366,9 +386,9 @@
 								<span class="inline-block border rounded-full px-2.5 py-1 text-[11px] font-semibold {statusClass[event.status]}">
 									{statusLabel[event.status]}
 								</span>
-								{#if event.status === 'rejected' && event.reject_reason}
-									<p class="text-[10px] text-red-600 mt-1 line-clamp-1">
-										Alasan: {event.reject_reason}
+								{#if (event.status === 'rejected' || event.status === 'revision_requested') && event.reject_reason}
+									<p class="text-[10px] {event.status === 'rejected' ? 'text-red-600' : 'text-orange-700'} mt-1 line-clamp-2">
+										{event.status === 'rejected' ? 'Alasan Tolak:' : 'Catatan Revisi:'} {event.reject_reason}
 									</p>
 								{/if}
 							</td>
@@ -376,8 +396,8 @@
 							<!-- Actions -->
 							<td class="px-4 py-3.5 text-right">
 								<div class="flex items-center justify-end gap-1.5">
-									<!-- Submit for approval action if draft -->
-									{#if event.status === 'draft' || event.status === 'rejected'}
+									<!-- Submit for approval action if draft / rejected / revision_requested -->
+									{#if event.status === 'draft' || event.status === 'rejected' || event.status === 'revision_requested'}
 										<button
 											onclick={() => handleStatusChange(event.id, 'pending_approval')}
 											title="Ajukan Approval"

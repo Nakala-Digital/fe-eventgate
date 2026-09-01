@@ -5,7 +5,7 @@
 	import { authStore, type AuthState } from '$lib/stores/authStore';
 	import { getEventById, updateEventStatus, getApprovalLogs, type ManagedEvent } from '$lib/services/eventApi';
 	import ConfirmActionModal from '$lib/components/common/ConfirmActionModal.svelte';
-	import { ArrowLeft, Calendar, MapPin, Image as ImageIcon, CheckCircle2, AlertCircle, X, Check } from 'lucide-svelte';
+	import { ArrowLeft, Calendar, MapPin, Image as ImageIcon, CheckCircle2, AlertCircle, X, Check, Edit3 } from 'lucide-svelte';
 
 	let currentAuth = $state<AuthState>({ isAuthenticated: false, user: null, token: null });
 	authStore.subscribe((state) => (currentAuth = state));
@@ -15,7 +15,7 @@
 	let event = $state<ManagedEvent | null>(null);
 	let isLoading = $state(true);
 	let feedback = $state<{ type: 'success' | 'error'; message: string } | null>(null);
-	let modalMode = $state<'approve' | 'reject' | null>(null);
+	let modalMode = $state<'approve' | 'reject' | 'revision' | null>(null);
 	let isSubmitting = $state(false);
 
 	onMount(() => {
@@ -30,11 +30,11 @@
 		isLoading = true;
 		try {
 			event = await getEventById(eventId);
-			// Backend menyimpan alasan reject di approval log, bukan di objek event.
-			if (event && event.status === 'rejected' && !event.reject_reason) {
+			// Backend menyimpan alasan reject/revisi di approval log, bukan di objek event.
+			if (event && (event.status === 'rejected' || event.status === 'revision_requested') && !event.reject_reason) {
 				const logs = await getApprovalLogs(eventId);
-				const lastReject = [...logs].reverse().find((l) => l.action === 'rejected');
-				if (lastReject?.notes) event.reject_reason = lastReject.notes;
+				const lastLog = [...logs].reverse().find((l) => l.action === 'rejected' || l.action === 'revision_requested');
+				if (lastLog?.notes) event.reject_reason = lastLog.notes;
 			}
 		} catch {
 			event = null;
@@ -81,6 +81,9 @@
 			if (modalMode === 'approve') {
 				await updateEventStatus(event.id, 'approved');
 				feedback = { type: 'success', message: 'Event berhasil disetujui.' };
+			} else if (modalMode === 'revision') {
+				await updateEventStatus(event.id, 'revision_requested', reason);
+				feedback = { type: 'success', message: 'Permintaan revisi event berhasil dikirim.' };
 			} else if (modalMode === 'reject') {
 				await updateEventStatus(event.id, 'rejected', reason);
 				feedback = { type: 'success', message: 'Event berhasil ditolak.' };
@@ -157,6 +160,13 @@
 						<span>Setujui Event</span>
 					</button>
 					<button
+						onclick={() => (modalMode = 'revision')}
+						class="inline-flex items-center gap-1.5 text-xs font-semibold bg-[#FEF3C7] hover:bg-amber-200 text-[#D97706] border border-amber-300 px-4 py-2 rounded-lg transition"
+					>
+						<Edit3 class="w-4 h-4" />
+						<span>Minta Revisi</span>
+					</button>
+					<button
 						onclick={() => (modalMode = 'reject')}
 						class="inline-flex items-center gap-1.5 text-xs font-semibold bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 px-4 py-2 rounded-lg transition"
 					>
@@ -167,10 +177,14 @@
 			{/if}
 		</div>
 
-		{#if event.status === 'rejected' && event.reject_reason}
-			<div class="text-xs rounded-xl p-4 border bg-red-50 text-red-700 border-red-200 shadow-xs space-y-1">
-				<p class="font-bold flex items-center gap-1.5 text-red-800">
-					<AlertCircle class="w-4 h-4" /> Alasan Penolakan:
+		{#if (event.status === 'rejected' || event.status === 'revision_requested') && event.reject_reason}
+			<div
+				class="text-xs rounded-xl p-4 border shadow-xs space-y-1 {event.status === 'rejected'
+					? 'bg-red-50 text-red-700 border-red-200'
+					: 'bg-orange-50 text-orange-800 border-orange-200'}"
+			>
+				<p class="font-bold flex items-center gap-1.5 {event.status === 'rejected' ? 'text-red-800' : 'text-orange-900'}">
+					<AlertCircle class="w-4 h-4" /> {event.status === 'rejected' ? 'Alasan Penolakan:' : 'Catatan Permintaan Revisi:'}
 				</p>
 				<p class="text-slate-700 pl-5">{event.reject_reason}</p>
 			</div>
@@ -245,15 +259,27 @@
 	{/if}
 </div>
 
-<!-- Modal Konfirmasi Setujui / Tolak -->
+<!-- Modal Konfirmasi Setujui / Minta Revisi / Tolak -->
 <ConfirmActionModal
 	open={modalMode !== null}
-	title={modalMode === 'approve' ? 'Setujui Pengajuan Event?' : 'Tolak Pengajuan Event'}
+	title={modalMode === 'approve'
+		? 'Setujui Pengajuan Event?'
+		: modalMode === 'revision'
+			? 'Minta Revisi Pengajuan Event'
+			: 'Tolak Pengajuan Event'}
 	description={event ? `Event "${event.title}" oleh ${event.organizer_name}.` : ''}
-	requireReason={modalMode === 'reject'}
-	reasonLabel="Alasan Penolakan (wajib)"
-	confirmLabel={modalMode === 'approve' ? 'Ya, Setujui' : 'Kirim Penolakan'}
-	confirmClass={modalMode === 'approve' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700'}
+	requireReason={modalMode === 'reject' || modalMode === 'revision'}
+	reasonLabel={modalMode === 'revision' ? 'Catatan / Alasan Revisi (wajib)' : 'Alasan Penolakan (wajib)'}
+	confirmLabel={modalMode === 'approve'
+		? 'Ya, Setujui'
+		: modalMode === 'revision'
+			? 'Kirim Permintaan Revisi'
+			: 'Kirim Penolakan'}
+	confirmClass={modalMode === 'approve'
+		? 'bg-emerald-600 hover:bg-emerald-700'
+		: modalMode === 'revision'
+			? 'bg-amber-600 hover:bg-amber-700'
+			: 'bg-red-600 hover:bg-red-700'}
 	{isSubmitting}
 	onConfirm={handleConfirm}
 	onCancel={() => (modalMode = null)}
