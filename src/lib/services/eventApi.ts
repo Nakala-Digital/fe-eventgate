@@ -270,10 +270,7 @@ function formatToIso(dateStr?: string): string {
 function formatEventPayload(data: EventFormData) {
 	const startTimeIso = formatToIso(data.start_date);
 	const endTimeIso = formatToIso(data.end_date);
-	const banner =
-		data.banner_url && data.banner_url.trim()
-			? data.banner_url.trim()
-			: 'https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=600&q=80';
+	const banner = data.banner_url && data.banner_url.trim() ? data.banner_url.trim() : '';
 
 	return {
 		title: data.title?.trim() ?? '',

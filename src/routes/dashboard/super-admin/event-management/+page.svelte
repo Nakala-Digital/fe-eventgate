@@ -153,8 +153,8 @@
 			const label = statusLabel[targetStatus];
 			feedback = { type: 'success', message: `Status event berhasil diubah menjadi ${label}.` };
 			await loadData();
-		} catch {
-			feedback = { type: 'error', message: 'Gagal memperbarui status event.' };
+		} catch (err: any) {
+			feedback = { type: 'error', message: err?.message || 'Gagal memperbarui status event.' };
 		}
 	}
 </script>
